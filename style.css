@@ -1,0 +1,130 @@
+/* ===== Global Styles ===== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Roboto', Arial, sans-serif;
+    background: #f4f6f9;
+    color: #333;
+    line-height: 1.6;
+}
+
+/* ===== Header ===== */
+/* ===== Full-Width Header ===== */
+h2 {
+    width: 100%;
+    text-align: center;
+    margin: 0; /* Remove default top/bottom gap */
+    padding: 25px 0; /* Vertical padding only */
+    font-size: 30px;
+    font-weight: 700;
+    color: #0072ff;
+    background: linear-gradient(135deg, rgba(0,198,255,0.15), rgba(0,114,255,0.15));
+    border-radius: 0; /* Remove corner radius for full-width look */
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    position: relative;
+}
+
+/* Optional gradient underline */
+h2::after {
+    content: '';
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 4px;
+    background: linear-gradient(90deg, #00c6ff, #0072ff);
+    border-radius: 2px;
+}
+
+
+/* ===== Date Input Container ===== */
+.dateInputContainer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin: 15px 20px;
+    gap: 10px;
+}
+
+.dateInputContainer label {
+    font-weight: 500;
+    font-size: 16px;
+    color: #555;
+}
+
+.dateInputContainer input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: 0.3s;
+}
+
+.dateInputContainer input[type="date"]:focus {
+    border-color: #0072ff;
+    box-shadow: 0 0 6px rgba(0, 114, 255, 0.3);
+    outline: none;
+}
+
+.dateInputContainer button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #00c6ff, #0072ff);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.dateInputContainer button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 114, 255, 0.4);
+}
+
+/* ===== Chart Container ===== */
+canvas {
+    display: block;
+    max-width: 95%;
+    margin: 20px auto;
+    background: #fff;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    padding: 20px;
+}
+
+/* ===== Chart.js Tooltip Customization ===== */
+.chartjs-tooltip {
+    background: rgba(0, 114, 255, 0.85);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+/* ===== Responsive ===== */
+@media screen and (max-width: 768px) {
+    h2 {
+        font-size: 24px;
+        padding: 12px 8px;
+    }
+
+    .dateInputContainer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .dateInputContainer button {
+        width: 100%;
+        margin-top: 8px;
+    }
+}
