@@ -5,6 +5,7 @@ const SHEET_PREFIX = 'EEE Block-1 Solar Data_Slave_1_';
 const POLLING_INTERVAL = 120000;
 
 let pollingTimer = null;
+let isLive = false;
 
 google.charts.setOnLoadCallback(init);
 
@@ -29,7 +30,7 @@ function onDateSelect() {
   if (selectedDate === getTodayDate()) {
     startPolling(selectedDate);
   } else {
-    document.getElementById('status').innerText = 'Showing historical data';
+    setHistoricalStatus();
   }
 }
 
@@ -64,6 +65,7 @@ function loadData(dateValue) {
 
     drawChart(data);
     showTotalPower(data);
+    detectPowerEvents(data);
     updateLastUpdatedTime();
   });
 }
@@ -71,15 +73,25 @@ function loadData(dateValue) {
 function drawChart(data) {
   const options = {
     title: 'Solar Power Generation',
+    curveType: 'function',
+    lineWidth: 3,
     hAxis: {
       title: 'Time',
-      format: 'HH:mm'
+      format: 'HH:mm',
+      slantedText: true,
+      slantedTextAngle: 45
     },
     vAxis: {
       title: 'Generated Power (Watts)',
       minValue: 0
     },
-    legend: 'none'
+    legend: 'none',
+    chartArea: {
+      left: 70,
+      right: 20,
+      top: 50,
+      bottom: 80
+    }
   };
 
   const chart = new google.visualization.LineChart(
@@ -103,13 +115,64 @@ function showTotalPower(data) {
     `Total Power Generated (Day): ${total.toFixed(2)} Watts`;
 }
 
+function detectPowerEvents(data) {
+  const DROP_THRESHOLD = 15000;
+  let lastPower = null;
+  let events = [];
+
+  for (let i = 0; i < data.getNumberOfRows(); i++) {
+    const time = data.getValue(i, 0);
+    const power = data.getValue(i, 1);
+
+    if (lastPower !== null) {
+      const drop = lastPower - power;
+
+      if (drop > DROP_THRESHOLD) {
+        let reason = 'Possible Grid / Inverter Issue';
+
+        if (power < 1000) {
+          reason = 'Possible Power Outage or Inverter Shutdown';
+        } else {
+          reason = 'Possible Heavy Cloud or Load Fluctuation';
+        }
+
+        events.push(`${time.toLocaleTimeString()} – ${reason}`);
+      }
+    }
+
+    lastPower = power;
+  }
+
+  displayEvents(events);
+}
+
+function displayEvents(events) {
+  const container = document.getElementById('events');
+
+  if (!container) return;
+
+  if (events.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  let html = '<strong>⚠ Detected Power Drop Events:</strong><br>';
+
+  events.forEach(e => {
+    html += `• ${e}<br>`;
+  });
+
+  container.innerHTML = html;
+}
+
 function updateLastUpdatedTime() {
-  const now = new Date();
-  // document.getElementById('last_updated').innerText = `Last updated at: ${now.toLocaleTimeString()}`;
+  document.getElementById('last_updated').innerText =
+    `Last updated at: ${new Date().toLocaleTimeString()}`;
 }
 
 function startPolling(dateValue) {
-  // document.getElementById('status').innerText = 'Live data (auto-updates every 2 minutes)';
+  isLive = true;
+  setLiveStatus();
 
   pollingTimer = setInterval(() => {
     loadData(dateValue);
@@ -121,6 +184,16 @@ function stopPolling() {
     clearInterval(pollingTimer);
     pollingTimer = null;
   }
+  isLive = false;
+}
+
+function setLiveStatus() {
+  document.getElementById('status').innerHTML =
+    `<span class="live-dot"></span> LIVE (auto-updating every 2 minutes)`;
+}
+
+function setHistoricalStatus() {
+  document.getElementById('status').innerText = 'Showing historical data';
 }
 
 function clearUI() {
@@ -128,6 +201,8 @@ function clearUI() {
   document.getElementById('total_power').innerText = '';
   document.getElementById('last_updated').innerText = '';
   document.getElementById('status').innerText = '';
+  const events = document.getElementById('events');
+  if (events) events.innerHTML = '';
 }
 
 function getTodayDate() {

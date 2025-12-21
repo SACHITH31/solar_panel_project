@@ -27,6 +27,23 @@
       margin-top: 10px;
       font-size: 14px;
       color: green;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .live-dot {
+      width: 10px;
+      height: 10px;
+      background-color: green;
+      border-radius: 50%;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0.2; }
+      100% { opacity: 1; }
     }
 
     #last_updated {
@@ -47,6 +64,8 @@
   <div id="last_updated"></div>
   <div id="chart_div"></div>
   <div id="total_power"></div>
+  <div id="events" style="margin-top:10px;color:#b00020;font-size:14px;"></div>
+
 
   <script src="script.js"></script>
 </body>
