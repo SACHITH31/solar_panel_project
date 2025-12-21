@@ -179,6 +179,9 @@ button:hover {
   color: #b00020;
   font-size: 14px;
 }
+.event-card li::marker {
+    padding-left: 50px;
+}
 
 /* ===== Responsive ===== */
 @media screen and (max-width: 768px) {

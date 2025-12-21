@@ -204,10 +204,13 @@ function displayEvents(events) {
   let html = '<strong>⚠ Detected Power Drop Events:</strong><br>';
 
   events.forEach(e => {
-    html += `• ${e}<br>`;
+    const eventElement = document.createElement('li');
+    eventElement.style.marginTop = '6px';
+    eventElement.textContent = e;
+    container.appendChild(eventElement)
   });
 
-  container.innerHTML = html;
+  container.innerHTML = html + container.innerHTML;
 }
 
 function updateLastUpdatedTime() {
