@@ -190,6 +190,9 @@ function detectPowerEvents(data) {
 
 function displayEvents(events) {
   const container = document.getElementById('events');
+  container.style.fontSize = '14px';
+  container.style.marginTop = '20px';
+  container.style.color = '#b00020';
 
   if (!container) return;
 

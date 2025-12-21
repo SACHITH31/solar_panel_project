@@ -59,10 +59,28 @@ h2::after {
   transition: all 0.3s ease;
 }
 
+#datePicker:hover {
+  border-color: #0072ff;
+  box-shadow: 0 0 8px rgba(0,114,255,0.1);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.5);
+}
+
 #datePicker:focus {
   border-color: #0072ff;
   box-shadow: 0 0 8px rgba(0,114,255,0.2);
   outline: none;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  background-color: #d37f19; /* Solid Orange Background */
+  padding: 8px;
+  border-radius: 5px;
+  filter: invert(1); /* This turns the icon inside the orange box white */
+  cursor: pointer;
 }
 
 button {
@@ -84,7 +102,8 @@ button:hover {
 
 /* Status */
 #status {
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 625;
   color: #1a7f1a;
   display: flex;
   align-items: center;
@@ -106,7 +125,8 @@ button:hover {
 
 #last_updated {
   padding-top:17px ;
-  font-size: 13px;
+  font-size: 16px;
+  font-weight: 500;
   color: #555;
 }
 
