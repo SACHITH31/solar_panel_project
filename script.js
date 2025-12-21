@@ -119,7 +119,10 @@ function drawChart(data) {
     annotations: {
       style: 'point',
       textStyle: {
-        fontSize: 12
+        fontSize: 12,
+        color: 'red',
+        bold: true,
+        auraColor: 'white'
       }
     },
 
