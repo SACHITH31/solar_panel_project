@@ -71,21 +71,58 @@ function loadData(dateValue) {
 }
 
 function drawChart(data) {
+
+  // Add annotation columns
+  data.addColumn({ type: 'string', role: 'annotation' });
+  data.addColumn({ type: 'string', role: 'annotationText' });
+
+  const DROP_THRESHOLD = 15000;
+  let lastPower = null;
+
+  for (let i = 0; i < data.getNumberOfRows(); i++) {
+    const power = data.getValue(i, 1);
+    const time = data.getValue(i, 0);
+
+    let marker = null;
+    let message = null;
+
+    if (lastPower !== null && lastPower - power > DROP_THRESHOLD) {
+      marker = '⚠';
+      message =
+        power < 1000
+          ? 'Possible Power Outage / Inverter Shutdown'
+          : 'Possible Cloud or Load Fluctuation';
+    }
+
+    data.setValue(i, 2, marker);
+    data.setValue(i, 3, message);
+
+    lastPower = power;
+  }
+
   const options = {
     title: 'Solar Power Generation',
     curveType: 'function',
     lineWidth: 3,
+    legend: 'none',
+
     hAxis: {
       title: 'Time',
-      format: 'HH:mm',
-      slantedText: true,
-      slantedTextAngle: 45
+      format: 'HH:mm'
     },
+
     vAxis: {
       title: 'Generated Power (Watts)',
       minValue: 0
     },
-    legend: 'none',
+
+    annotations: {
+      style: 'point',
+      textStyle: {
+        fontSize: 12
+      }
+    },
+
     chartArea: {
       left: 70,
       right: 20,
@@ -100,6 +137,7 @@ function drawChart(data) {
 
   chart.draw(data, options);
 }
+
 
 function showTotalPower(data) {
   let total = 0;
