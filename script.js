@@ -2,10 +2,9 @@ google.charts.load('current', { packages: ['corechart'] });
 
 const SPREADSHEET_ID = '1AdBjvpwcuAPetNtZXWR1nWwQTdbLCpslQ6xWbcPr5M0';
 const SHEET_PREFIX = 'EEE Block-1 Solar Data_Slave_1_';
-const POLLING_INTERVAL = 120000; // 2 minutes
+const POLLING_INTERVAL = 120000;
 
 let pollingTimer = null;
-let currentDateLoaded = null;
 
 google.charts.setOnLoadCallback(init);
 
@@ -35,8 +34,6 @@ function onDateSelect() {
 }
 
 function loadData(dateValue) {
-  currentDateLoaded = dateValue;
-
   const sheetName = SHEET_PREFIX + dateValue;
 
   const queryString = `
@@ -52,9 +49,7 @@ function loadData(dateValue) {
 
   query.send(function (response) {
     if (response.isError()) {
-      document.getElementById('chart_div').innerHTML = '';
-      document.getElementById('total_power').innerHTML = '';
-      document.getElementById('status').innerText = '';
+      clearUI();
       alert('No data found for selected date');
       return;
     }
@@ -62,17 +57,14 @@ function loadData(dateValue) {
     const data = response.getDataTable();
 
     if (!data || data.getNumberOfRows() === 0) {
-      document.getElementById('chart_div').innerHTML = '';
-      document.getElementById('total_power').innerHTML = '';
-      document.getElementById('status').innerText = '';
+      clearUI();
       alert('No data found for selected date');
       return;
     }
 
     drawChart(data);
     showTotalPower(data);
-    console.log(`Data loaded for date: ${dateValue}`);
-    console.log(POLLING_INTERVAL ? 'Polling is active' : 'Polling is inactive');
+    updateLastUpdatedTime();
   });
 }
 
@@ -111,8 +103,13 @@ function showTotalPower(data) {
     `Total Power Generated (Day): ${total.toFixed(2)} Watts`;
 }
 
+function updateLastUpdatedTime() {
+  const now = new Date();
+  // document.getElementById('last_updated').innerText = `Last updated at: ${now.toLocaleTimeString()}`;
+}
+
 function startPolling(dateValue) {
-  document.getElementById('status').innerText = 'Live data (auto-updates every 2 minutes)';
+  // document.getElementById('status').innerText = 'Live data (auto-updates every 2 minutes)';
 
   pollingTimer = setInterval(() => {
     loadData(dateValue);
@@ -126,7 +123,13 @@ function stopPolling() {
   }
 }
 
+function clearUI() {
+  document.getElementById('chart_div').innerHTML = '';
+  document.getElementById('total_power').innerText = '';
+  document.getElementById('last_updated').innerText = '';
+  document.getElementById('status').innerText = '';
+}
+
 function getTodayDate() {
-  const today = new Date();
-  return today.toISOString().split('T')[0];
+  return new Date().toISOString().split('T')[0];
 }
