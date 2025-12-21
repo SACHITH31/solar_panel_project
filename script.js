@@ -27,6 +27,7 @@ function loadData() {
   query.send(function (response) {
     if (response.isError()) {
       document.getElementById('chart_div').innerHTML = '';
+      document.getElementById('total_power').innerHTML = '';
       alert('No data found for selected date');
       return;
     }
@@ -35,11 +36,13 @@ function loadData() {
 
     if (!data || data.getNumberOfRows() === 0) {
       document.getElementById('chart_div').innerHTML = '';
+      document.getElementById('total_power').innerHTML = '';
       alert('No data found for selected date');
       return;
     }
 
     drawChart(data);
+    showTotalPower(data);
   });
 }
 
@@ -62,4 +65,18 @@ function drawChart(data) {
   );
 
   chart.draw(data, options);
+}
+
+function showTotalPower(data) {
+  let total = 0;
+
+  for (let i = 0; i < data.getNumberOfRows(); i++) {
+    const value = data.getValue(i, 1);
+    if (!isNaN(value)) {
+      total += value;
+    }
+  }
+
+  document.getElementById('total_power').innerHTML =
+    `Total Power Generated (Day): ${total.toFixed(2)} Watts`;
 }
