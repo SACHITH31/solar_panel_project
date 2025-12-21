@@ -1,2 +1,3 @@
 # just ignore the drawchart.txt file which is in the same directory
 drawchart.txt
+.gitignore
