@@ -22,6 +22,12 @@
       font-size: 18px;
       font-weight: bold;
     }
+
+    #status {
+      margin-top: 10px;
+      font-size: 14px;
+      color: green;
+    }
   </style>
 </head>
 <body>
@@ -29,8 +35,9 @@
   <h2>Solar Panel Usage Graph</h2>
 
   <input type="date" id="datePicker">
-  <button onclick="loadData()">OK</button>
+  <button onclick="onDateSelect()">OK</button>
 
+  <div id="status"></div>
   <div id="chart_div"></div>
   <div id="total_power"></div>
 

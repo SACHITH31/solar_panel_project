@@ -2,14 +2,40 @@ google.charts.load('current', { packages: ['corechart'] });
 
 const SPREADSHEET_ID = '1AdBjvpwcuAPetNtZXWR1nWwQTdbLCpslQ6xWbcPr5M0';
 const SHEET_PREFIX = 'EEE Block-1 Solar Data_Slave_1_';
+const POLLING_INTERVAL = 120000; // 2 minutes
 
-function loadData() {
-  const dateValue = document.getElementById('datePicker').value;
+let pollingTimer = null;
+let currentDateLoaded = null;
 
-  if (!dateValue) {
+google.charts.setOnLoadCallback(init);
+
+function init() {
+  const today = getTodayDate();
+  document.getElementById('datePicker').value = today;
+  loadData(today);
+  startPolling(today);
+}
+
+function onDateSelect() {
+  const selectedDate = document.getElementById('datePicker').value;
+
+  if (!selectedDate) {
     alert('Please select a date');
     return;
   }
+
+  stopPolling();
+  loadData(selectedDate);
+
+  if (selectedDate === getTodayDate()) {
+    startPolling(selectedDate);
+  } else {
+    document.getElementById('status').innerText = 'Showing historical data';
+  }
+}
+
+function loadData(dateValue) {
+  currentDateLoaded = dateValue;
 
   const sheetName = SHEET_PREFIX + dateValue;
 
@@ -23,28 +49,30 @@ function loadData() {
 
   const query = new google.visualization.Query(url);
   query.setQuery(queryString);
-//   console.log(query.iO)
 
   query.send(function (response) {
     if (response.isError()) {
       document.getElementById('chart_div').innerHTML = '';
       document.getElementById('total_power').innerHTML = '';
+      document.getElementById('status').innerText = '';
       alert('No data found for selected date');
       return;
     }
 
     const data = response.getDataTable();
-    // console.log(data)
 
     if (!data || data.getNumberOfRows() === 0) {
       document.getElementById('chart_div').innerHTML = '';
       document.getElementById('total_power').innerHTML = '';
+      document.getElementById('status').innerText = '';
       alert('No data found for selected date');
       return;
     }
 
     drawChart(data);
     showTotalPower(data);
+    console.log(`Data loaded for date: ${dateValue}`);
+    console.log(POLLING_INTERVAL ? 'Polling is active' : 'Polling is inactive');
   });
 }
 
@@ -79,6 +107,26 @@ function showTotalPower(data) {
     }
   }
 
-  document.getElementById('total_power').innerHTML =
+  document.getElementById('total_power').innerText =
     `Total Power Generated (Day): ${total.toFixed(2)} Watts`;
+}
+
+function startPolling(dateValue) {
+  document.getElementById('status').innerText = 'Live data (auto-updates every 2 minutes)';
+
+  pollingTimer = setInterval(() => {
+    loadData(dateValue);
+  }, POLLING_INTERVAL);
+}
+
+function stopPolling() {
+  if (pollingTimer) {
+    clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
+}
+
+function getTodayDate() {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
 }
