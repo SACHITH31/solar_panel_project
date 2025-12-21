@@ -1,121 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Solar Panel Power Generation</title>
+  <title>Solar Panel Efficiency</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-        canvas {
-            max-width: 100%;
-            height: 400px;
-        }
-    </style>
-    <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    #chart_div {
+      width: 100%;
+      height: 500px;
+      margin-top: 20px;
+    }
+  </style>
 </head>
 <body>
 
-<h2 style="text-align: center; margin: 10px; padding: 10px;">GPREC EEE BLOCK-1 SOLAR DATA</h2>
+  <h2>Solar Panel Usage Graph</h2>
 
-<div class="dateInputContainer" style="text-align: right; margin-right: 10px;">
-    <label for="dateInput">Select Date: </label>
-    <input type="date" id="dateInput">
-    <button onclick="loadData()">OK</button>
-</div>
+  <input type="date" id="datePicker">
+  <button onclick="loadData()">OK</button>
 
-<br><br>
+  <div id="chart_div"></div>
 
-<canvas id="solarChart"></canvas>
-
-<script>
-let chart;
-
-function loadData() {
-    const selectedDate = document.getElementById("dateInput").value;
-    if (!selectedDate) {
-        alert("Please select a date");
-        return;
-    }
-
-    const sheetId = "1AdBjvpwcuAPetNtZXWR1nWwQTdbLCpslQ6xWbcPr5M0";
-
-    const url =
-        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?sheet=EEE%20Block-1%20Solar%20Data_Slave_1_2025-12-20&tq=` +
-        encodeURIComponent("SELECT A,B");
-
-    fetch(url)
-        .then(res => res.text())
-        .then(text => {
-            const json = JSON.parse(text.substring(47).slice(0, -2));
-            const rows = json.table.rows;
-
-            let times = [];
-            let watts = [];
-
-            rows.forEach(row => {
-                if (!row.c[0] || !row.c[1]) return;
-
-                const timestamp = row.c[0].f || row.c[0].v;
-                const wattValue = row.c[1].v;
-
-                const dateObj = new Date(timestamp);
-                const rowDate = dateObj.toISOString().split("T")[0];
-
-                if (rowDate === selectedDate) {
-                    times.push(
-                        dateObj.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            // second: "2-digit"
-                        })
-                    );
-                    watts.push(wattValue);
-                }
-            });
-
-            drawChart(times, watts);
-        });
-}
-
-function drawChart(times, watts) {
-    const ctx = document.getElementById("solarChart").getContext("2d");
-
-    if (chart) chart.destroy();
-
-    chart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: times,
-            datasets: [{
-                label: "Watts Generated",
-                data: watts,
-                borderWidth: 2,
-                tension: 0.3
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: "Time"
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: "Watts"
-                    }
-                }
-            }
-        }
-    });
-}
-</script>
-
+  <script src="script.js"></script>
 </body>
 </html>
