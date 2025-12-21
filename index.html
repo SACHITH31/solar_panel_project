@@ -3,6 +3,7 @@
 <head>
   <title>Solar Panel Efficiency</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/charts/loader.js"></script>
 
   <style>
@@ -51,21 +52,43 @@
       color: #555;
       margin-bottom: 10px;
     }
+    #chart_div svg {
+      cursor: pointer;
+    }
+    /* or 
+    g rect {
+      cursor: pointer;
+    } */
+
   </style>
 </head>
 <body>
 
-  <h2>Solar Panel Usage Graph</h2>
+  <div class="dashboard-container">
+    <h2 style="text-align: center;">GPREC EEE_BLOCK_1 SOLAR DATA</h2>
+    <div class="controls-card">
+      <input type="date" id="datePicker">
+      <button onclick="onDateSelect()">OK</button>
+      <div id="status"><span class="live-dot"></span></div>
+      <div id="last_updated"></div>
+  </div>
 
-  <input type="date" id="datePicker">
-  <button onclick="onDateSelect()">OK</button>
+  
+  <div class="chart-card">
+    <div id="chart_div"></div>
+  </div>
+  
+  <div class="info-cards">
+    <div id="custom_legend" style="margin-top:8px;font-size:14px; background-color: rgb(250, 235, 215); padding: 10px;">
+      <span style="color:red;font-weight:bold;">⚠</span>
+      Sudden power drop detected (possible outage / inverter issue)
+    </div>
+  </div>
 
-  <div id="status"></div>
-  <div id="last_updated"></div>
-  <div id="chart_div"></div>
-  <div id="total_power"></div>
-  <div id="events" style="margin-top:10px;color:#b00020;font-size:14px;"></div>
-  <i class="fa-solid fa-triangle-exclamation" style="color: red;"></i>
+
+  <div id="total_power" class="power-card"></div>
+
+  <div id="events" class="event-card" style="margin-top:10px;color:#b00020;font-size:14px;"></div>
   <script src="script.js"></script>
 </body>
 </html>

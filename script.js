@@ -122,7 +122,8 @@ function drawChart(data) {
         fontSize: 12,
         color: 'red',
         bold: true,
-        auraColor: 'white'
+        auraColor: 'white',
+        cursor: 'pointer'
       }
     },
 
