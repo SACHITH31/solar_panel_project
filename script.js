@@ -23,6 +23,7 @@ function loadData() {
 
   const query = new google.visualization.Query(url);
   query.setQuery(queryString);
+//   console.log(query.iO)
 
   query.send(function (response) {
     if (response.isError()) {
@@ -33,6 +34,7 @@ function loadData() {
     }
 
     const data = response.getDataTable();
+    // console.log(data)
 
     if (!data || data.getNumberOfRows() === 0) {
       document.getElementById('chart_div').innerHTML = '';
