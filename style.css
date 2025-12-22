@@ -242,3 +242,7 @@ button:hover {
   font-weight: 600;
   box-shadow: 0 6px 18px rgba(0,0,0,0.06);
 }
+#inverter-health {
+  border-radius: 8px;
+  border-left: 5px solid green;
+}

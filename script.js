@@ -66,6 +66,7 @@ function loadData(dateValue) {
     drawChart(data);
     showLiveWatt(data);
     showTotalPower(data);
+    updateInverterHealth(data);
     detectPowerEvents(data);
     updateLastUpdatedTime(dateValue);
   });
@@ -171,6 +172,39 @@ function showTotalPower(data) {
   document.getElementById('total_power').innerText =
     `Solar Power Generated on ${returnTodaysDate()}: ${total.toFixed(2)/1000} KWH`;
 }
+
+function updateInverterHealth(data) {
+  let lastPower = null;
+  let worstDropPercent = 0;
+
+  for (let i = 0; i < data.getNumberOfRows(); i++) {
+    const power = data.getValue(i, 1);
+
+    if (lastPower !== null && lastPower > 0) {
+      const drop = lastPower - power;
+
+      if (drop > 0) {
+        const dropPercent = (drop / lastPower) * 100;
+        if (dropPercent > worstDropPercent) {
+          worstDropPercent = dropPercent;
+        }
+      }
+    }
+
+    lastPower = power;
+  }
+
+  const health = Math.max(100 - worstDropPercent, 0).toFixed(1);
+
+  document.getElementById('inverter-health').innerHTML =
+    `🟢 Inverter Health : <strong>${health}%</strong>`;
+  document.getElementById('inverter-health').style.color = health < 70 ? '#388e3c' : '#b00020';
+  document.getElementById('inverter-health').style.fontWeight = '600';
+  document.getElementById('inverter-health').style.marginTop = '20px';
+  document.getElementById('inverter-health').style.backgroundColor = health < 70 ? '#ffffff' : '#ffcdd2';
+  document.getElementById('inverter-health').style.padding = '15px 18px';
+}
+
 
 function detectPowerEvents(data) {
   const DROP_THRESHOLD = 15000;
