@@ -66,7 +66,7 @@ function loadData(dateValue) {
     drawChart(data);
     showTotalPower(data);
     detectPowerEvents(data);
-    updateLastUpdatedTime();
+    updateLastUpdatedTime(dateValue);
   });
 }
 
@@ -213,10 +213,14 @@ function displayEvents(events) {
   container.innerHTML = html + container.innerHTML;
 }
 
-function updateLastUpdatedTime() {
-  document.getElementById('last_updated').innerText =
-    `Last updated at: ${new Date().toLocaleTimeString()}`;
+function updateLastUpdatedTime(selectedDate) {
+  const time = new Date().toLocaleTimeString();
+
+  document.getElementById('last_updated').innerHTML =
+    `Last updated at: <strong font-size:16px;>${time}</strong> 
+     <span style="margin-left:5px;color:#666; font-size:16px;">|<span style="font-size:16px; margin-left:6px;">Date:</span> <strong>${selectedDate}</strong></span>`;
 }
+
 
 function startPolling(dateValue) {
   isLive = true;

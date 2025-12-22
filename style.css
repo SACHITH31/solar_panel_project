@@ -125,7 +125,7 @@ button:hover {
 
 #last_updated {
   padding-top:17px ;
-  font-size: 16px;
+  font-size: 16px !important;
   font-weight: 500;
   color: #555;
 }
