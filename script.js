@@ -229,7 +229,7 @@ function updateLastUpdatedTime(selectedDate) {
      dateInput.className = 'static-date';
      const span = document.createElement('span');
      span.className = 'date-label';
-     span.style = 'color: rgba(15, 111, 228, 1); margin-left: 50px; font-weight: 600; margin-right: 6px;';
+     span.style = 'color: rgba(228, 15, 15, 1); margin-left: 50px; font-weight: 600; margin-right: 6px;';
      span.innerText = 'TODAY\'S DATE:';
      document.getElementById('last_updated').appendChild(span);
      document.getElementById('last_updated').appendChild(dateInput);
