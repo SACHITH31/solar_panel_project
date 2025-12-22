@@ -217,8 +217,22 @@ function updateLastUpdatedTime(selectedDate) {
   const time = new Date().toLocaleTimeString();
 
   document.getElementById('last_updated').innerHTML =
-    `Last updated at: <strong font-size:16px;>${time}</strong> 
-     <span style="margin-left:5px;color:#666; font-size:16px;">|<span style="font-size:16px; margin-left:6px;">Date:</span> <strong>${selectedDate}</strong></span>`;
+    `Last updated at: <strong font-size:16px;>${time}</strong>`;
+     // creating the new input element with the today's date which is kept disabled
+     const dateInput = document.createElement('input');
+     dateInput.id = 'today_date_display';
+     dateInput.type = 'date';
+     dateInput.value = new Date().toISOString().split('T')[0];
+     dateInput.disabled = true;
+     dateInput.style.marginLeft = '6px';
+     dateInput.style.fontSize = '16px';
+     dateInput.className = 'static-date';
+     const span = document.createElement('span');
+     span.className = 'date-label';
+     span.style = 'color: rgba(15, 111, 228, 1); margin-left: 50px; font-weight: 600; margin-right: 6px;';
+     span.innerText = 'TODAY\'S DATE:';
+     document.getElementById('last_updated').appendChild(span);
+     document.getElementById('last_updated').appendChild(dateInput);
 }
 
 

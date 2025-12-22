@@ -198,3 +198,24 @@ button:hover {
     width: 100%;
   }
 }
+
+.static-date {
+  margin-left: 0px !important;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 1px solid rgb(59, 58, 58);
+  border-radius: 5px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  cursor: not-allowed;
+}
+
+/* Remove browser default styles */
+.static-date::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.static-date:disabled {
+  opacity: 1;
+}
