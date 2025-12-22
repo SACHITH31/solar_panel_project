@@ -148,22 +148,28 @@ function showLiveWatt(data) {
   const liveWatt = data.getValue(lastRow, 1);
 
   document.getElementById('live_watt').innerHTML =
-    `⚡ Live Watt : <strong>${Math.floor(liveWatt/1000)} KWH</strong>`;
+    // `⚡ Live Watt : <strong>${Math.floor(liveWatt/1000)} KWH</strong>`;
+    `⚡ Live Watt : <strong>${liveWatt}W</strong>`;
 }
 
+function returnTodaysDate () {
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2, '0');
+  const mm = String(today.getMonth() + 1).padStart(2, '0'); //January is 0!
+  const yyyy = today.getFullYear();
+  return yyyy + '-' + mm + '-' + dd;
+}
 
 function showTotalPower(data) {
   let total = 0;
-
   for (let i = 0; i < data.getNumberOfRows(); i++) {
     const value = data.getValue(i, 1);
     if (!isNaN(value)) {
       total += value;
     }
   }
-
   document.getElementById('total_power').innerText =
-    `Total Power Generated (Day): ${total.toFixed(2)} Watts`;
+    `Solar Power Generated on ${returnTodaysDate()}: ${total.toFixed(2)/1000} KWH`;
 }
 
 function detectPowerEvents(data) {
