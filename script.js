@@ -64,6 +64,7 @@ function loadData(dateValue) {
     }
 
     drawChart(data);
+    showLiveWatt(data);
     showTotalPower(data);
     detectPowerEvents(data);
     updateLastUpdatedTime(dateValue);
@@ -140,6 +141,14 @@ function drawChart(data) {
   );
 
   chart.draw(data, options);
+}
+
+function showLiveWatt(data) {
+  const lastRow = data.getNumberOfRows() - 1;
+  const liveWatt = data.getValue(lastRow, 1);
+
+  document.getElementById('live_watt').innerHTML =
+    `⚡ Live Watt : <strong>${Math.floor(liveWatt/1000)} KWH</strong>`;
 }
 
 

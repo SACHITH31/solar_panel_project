@@ -219,3 +219,18 @@ button:hover {
 .static-date:disabled {
   opacity: 1;
 }
+
+.live-watt-card {
+  margin-top: 12px;
+  padding: 12px 18px;
+
+  background: #ffffff;
+  border-left: 5px solid #1a7f1a;
+  border-radius: 8px;
+
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a7f1a;
+
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+}
