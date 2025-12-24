@@ -87,13 +87,23 @@ function drawChart(data) {
   new google.visualization.LineChart(
     document.getElementById('chart_div')
   ).draw(data, {
-    title: 'Solar Power Generation',
-    curveType: 'function',
-    legend: 'none',
-    lineWidth: 3,
-    hAxis: { format: 'HH:mm' },
-    vAxis: { minValue: 0 }
-  });
+  title: 'Solar Power Generation',
+  curveType: 'function',
+  legend: 'none',
+  lineWidth: 3,
+  hAxis: { format: 'HH:mm' },
+  vAxis: { minValue: 0 },
+
+  // 🔴 MARKERS (annotations) IN RED
+  annotations: {
+    style: 'point',
+    textStyle: {
+      color: 'red',
+      fontSize: 14,
+      bold: true
+    }
+  }
+});
 }
 
 function showLiveWatt(data) {
@@ -105,14 +115,26 @@ function showLiveWatt(data) {
     `⚡ Live Watt : <strong>${kwh} kWh</strong>`;
 }
 
+function showCO2Saved(totalKwh) {
+  const CO2_FACTOR = 0.82; // kg per kWh
+  const co2 = totalKwh * CO2_FACTOR;
+
+  document.getElementById('co2_saved').innerHTML =
+    `🌱 CO₂ Saved : <strong>${co2.toFixed(0)} kg</strong>`;
+}
+
 function showTotalPower(data) {
   let total = 0;
   for (let i = 0; i < data.getNumberOfRows(); i++) {
     total += data.getValue(i, 1);
   }
 
+  const totalKwh = total / 1000;
+
   document.getElementById('total_power').innerText =
-    `Solar Energy Today : ${(total / 1000).toFixed(2)} kWh`;
+    `☀️ Solar Energy Today : ${totalKwh.toFixed(2)} kWh`;
+
+  showCO2Saved(totalKwh);
 }
 
 function updateInverterHealth(data) {
