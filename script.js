@@ -7,6 +7,9 @@ const POLLING_INTERVAL = 120000;
 let pollingTimer = null;
 let isLive = false;
 
+// ✅ GLOBAL SET → prevents duplicate events forever
+const detectedEventSet = new Set();
+
 google.charts.setOnLoadCallback(init);
 
 function init() {
@@ -18,7 +21,6 @@ function init() {
 
 function onDateSelect() {
   const selectedDate = document.getElementById('datePicker').value;
-
   if (!selectedDate) {
     alert('Please select a date');
     return;
@@ -37,44 +39,30 @@ function onDateSelect() {
 function loadData(dateValue) {
   const sheetName = SHEET_PREFIX + dateValue;
 
-  const queryString = `
-    SELECT A, B
-    WHERE A IS NOT NULL AND B IS NOT NULL
-  `;
+  const query = new google.visualization.Query(
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`
+  );
 
-  const url =
-    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`;
+  query.setQuery(`SELECT A, B WHERE A IS NOT NULL AND B IS NOT NULL`);
 
-  const query = new google.visualization.Query(url);
-  query.setQuery(queryString);
-
-  query.send(function (response) {
+  query.send(response => {
     if (response.isError()) {
       clearUI();
-      alert('No data found for selected date');
+      alert('No data found');
       return;
     }
 
     const data = response.getDataTable();
-
-    if (!data || data.getNumberOfRows() === 0) {
-      clearUI();
-      alert('No data found for selected date');
-      return;
-    }
-
     drawChart(data);
     showLiveWatt(data);
     showTotalPower(data);
     updateInverterHealth(data);
     detectPowerEvents(data);
-    updateLastUpdatedTime(dateValue);
+    updateLastUpdatedTime();
   });
 }
 
 function drawChart(data) {
-
-  // Add annotation columns
   data.addColumn({ type: 'string', role: 'annotation' });
   data.addColumn({ type: 'string', role: 'annotationText' });
 
@@ -83,223 +71,118 @@ function drawChart(data) {
 
   for (let i = 0; i < data.getNumberOfRows(); i++) {
     const power = data.getValue(i, 1);
-    const time = data.getValue(i, 0);
-
     let marker = null;
-    let message = null;
+    let text = null;
 
     if (lastPower !== null && lastPower - power > DROP_THRESHOLD) {
       marker = '⚠';
-      message =
-        power < 1000
-          ? 'Possible Power Outage / Inverter Shutdown'
-          : 'Possible Cloud or Load Fluctuation';
+      text = 'Sudden Power Drop';
     }
 
     data.setValue(i, 2, marker);
-    data.setValue(i, 3, message);
-
+    data.setValue(i, 3, text);
     lastPower = power;
   }
 
-  const options = {
+  new google.visualization.LineChart(
+    document.getElementById('chart_div')
+  ).draw(data, {
     title: 'Solar Power Generation',
     curveType: 'function',
-    lineWidth: 3,
     legend: 'none',
-
-    hAxis: {
-      title: 'Time',
-      format: 'HH:mm'
-    },
-
-    vAxis: {
-      title: 'Generated Power (Watts)',
-      minValue: 0
-    },
-
-    annotations: {
-      style: 'point',
-      textStyle: {
-        fontSize: 12,
-        color: 'red',
-        bold: true,
-        auraColor: 'white',
-        cursor: 'pointer'
-      }
-    },
-
-    chartArea: {
-      left: 70,
-      right: 20,
-      top: 50,
-      bottom: 80
-    }
-  };
-
-  const chart = new google.visualization.LineChart(
-    document.getElementById('chart_div')
-  );
-
-  chart.draw(data, options);
+    lineWidth: 3,
+    hAxis: { format: 'HH:mm' },
+    vAxis: { minValue: 0 }
+  });
 }
 
 function showLiveWatt(data) {
   const lastRow = data.getNumberOfRows() - 1;
-  const liveWatt = data.getValue(lastRow, 1);
+  const watt = data.getValue(lastRow, 1);
+  const kwh = (watt / 1000).toFixed(2);
 
   document.getElementById('live_watt').innerHTML =
-    // `⚡ Live Watt : <strong>${Math.floor(liveWatt/1000)} KWH</strong>`;
-    `⚡ Live Watt : <strong>${liveWatt}W</strong>`;
-}
-
-function returnTodaysDate () {
-  const today = new Date();
-  const dd = String(today.getDate()).padStart(2, '0');
-  const mm = String(today.getMonth() + 1).padStart(2, '0'); //January is 0!
-  const yyyy = today.getFullYear();
-  return yyyy + '-' + mm + '-' + dd;
+    `⚡ Live Watt : <strong>${kwh} kWh</strong>`;
 }
 
 function showTotalPower(data) {
   let total = 0;
   for (let i = 0; i < data.getNumberOfRows(); i++) {
-    const value = data.getValue(i, 1);
-    if (!isNaN(value)) {
-      total += value;
-    }
+    total += data.getValue(i, 1);
   }
+
   document.getElementById('total_power').innerText =
-    `Solar Power Generated on ${returnTodaysDate()}: ${total.toFixed(2)/1000} KWH`;
+    `Solar Energy Today : ${(total / 1000).toFixed(2)} kWh`;
 }
 
 function updateInverterHealth(data) {
   let lastPower = null;
-  let worstDropPercent = 0;
+  let maxDropPercent = 0;
 
   for (let i = 0; i < data.getNumberOfRows(); i++) {
     const power = data.getValue(i, 1);
-
-    if (lastPower !== null && lastPower > 0) {
-      const drop = lastPower - power;
-
-      if (drop > 0) {
-        const dropPercent = (drop / lastPower) * 100;
-        if (dropPercent > worstDropPercent) {
-          worstDropPercent = dropPercent;
-        }
-      }
+    if (lastPower && power < lastPower) {
+      const dropPercent = ((lastPower - power) / lastPower) * 100;
+      maxDropPercent = Math.max(maxDropPercent, dropPercent);
     }
-
     lastPower = power;
   }
 
-  const health = Math.max(100 - worstDropPercent, 0).toFixed(1);
+  const health = maxDropPercent === 0 ? 100 : (100 - maxDropPercent).toFixed(1);
 
   document.getElementById('inverter-health').innerHTML =
     `🟢 Inverter Health : <strong>${health}%</strong>`;
-  document.getElementById('inverter-health').style.color = health < 70 ? '#388e3c' : '#b00020';
-  document.getElementById('inverter-health').style.fontWeight = '600';
-  document.getElementById('inverter-health').style.marginTop = '20px';
-  document.getElementById('inverter-health').style.backgroundColor = health < 70 ? '#ffffff' : '#ffcdd2';
-  document.getElementById('inverter-health').style.padding = '15px 18px';
 }
-
 
 function detectPowerEvents(data) {
   const DROP_THRESHOLD = 15000;
   let lastPower = null;
-  let events = [];
 
   for (let i = 0; i < data.getNumberOfRows(); i++) {
     const time = data.getValue(i, 0);
     const power = data.getValue(i, 1);
 
-    if (lastPower !== null) {
-      const drop = lastPower - power;
+    if (lastPower && lastPower - power > DROP_THRESHOLD) {
+      const dropPercent = (((lastPower - power) / lastPower) * 100).toFixed(1);
+      const eventKey = `${time}-${dropPercent}`;
 
-      if (drop > DROP_THRESHOLD) {
-        let reason = 'Possible Grid / Inverter Issue';
-
-        if (power < 1000) {
-          reason = 'Possible Power Outage or Inverter Shutdown';
-        } else {
-          reason = 'Possible Heavy Cloud or Load Fluctuation';
-        }
-
-        events.push(`${time.toLocaleTimeString()} – ${reason}`);
+      if (!detectedEventSet.has(eventKey)) {
+        detectedEventSet.add(eventKey);
       }
     }
-
     lastPower = power;
   }
 
-  displayEvents(events);
+  displayEvents();
 }
 
-function displayEvents(events) {
+function displayEvents() {
   const container = document.getElementById('events');
-  container.style.fontSize = '14px';
-  container.style.marginTop = '20px';
-  container.style.color = '#b00020';
+  container.innerHTML = '';
+  if (detectedEventSet.size === 0) return;
 
-  if (!container) return;
+  container.innerHTML = '<strong>⚠ Detected Power Drop Events:</strong><br>';
 
-  if (events.length === 0) {
-    container.innerHTML = '';
-    return;
-  }
-
-  let html = '<strong>⚠ Detected Power Drop Events:</strong><br>';
-
-  events.forEach(e => {
-    const eventElement = document.createElement('li');
-    eventElement.style.marginTop = '6px';
-    eventElement.textContent = e;
-    container.appendChild(eventElement)
+  detectedEventSet.forEach(e => {
+    const li = document.createElement('li');
+    li.textContent = e;
+    container.appendChild(li);
   });
-
-  container.innerHTML = html + container.innerHTML;
 }
 
-function updateLastUpdatedTime(selectedDate) {
-  const time = new Date().toLocaleTimeString();
-
+function updateLastUpdatedTime() {
   document.getElementById('last_updated').innerHTML =
-    `Last updated at: <strong font-size:16px;>${time}</strong>`;
-     // creating the new input element with the today's date which is kept disabled
-     const dateInput = document.createElement('input');
-     dateInput.id = 'today_date_display';
-     dateInput.type = 'date';
-     dateInput.value = new Date().toISOString().split('T')[0];
-     dateInput.disabled = true;
-     dateInput.style.marginLeft = '6px';
-     dateInput.style.fontSize = '16px';
-     dateInput.className = 'static-date';
-     const span = document.createElement('span');
-     span.className = 'date-label';
-     span.style = 'color: rgba(228, 15, 15, 1); margin-left: 50px; font-weight: 600; margin-right: 6px;';
-     span.innerText = 'TODAY\'S DATE:';
-     document.getElementById('last_updated').appendChild(span);
-     document.getElementById('last_updated').appendChild(dateInput);
+    `Last updated at: <strong>${new Date().toLocaleTimeString()}</strong>`;
 }
 
-
-function startPolling(dateValue) {
+function startPolling(date) {
   isLive = true;
   setLiveStatus();
-
-  pollingTimer = setInterval(() => {
-    loadData(dateValue);
-  }, POLLING_INTERVAL);
+  pollingTimer = setInterval(() => loadData(date), POLLING_INTERVAL);
 }
 
 function stopPolling() {
-  if (pollingTimer) {
-    clearInterval(pollingTimer);
-    pollingTimer = null;
-  }
-  isLive = false;
+  clearInterval(pollingTimer);
 }
 
 function setLiveStatus() {
@@ -313,11 +196,7 @@ function setHistoricalStatus() {
 
 function clearUI() {
   document.getElementById('chart_div').innerHTML = '';
-  document.getElementById('total_power').innerText = '';
-  document.getElementById('last_updated').innerText = '';
-  document.getElementById('status').innerText = '';
-  const events = document.getElementById('events');
-  if (events) events.innerHTML = '';
+  document.getElementById('events').innerHTML = '';
 }
 
 function getTodayDate() {
