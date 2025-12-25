@@ -52,6 +52,15 @@ function onDateSelect() {
     return;
   }
 
+  // block dates outside valid range
+  if (!isDateInRange(selectedDate)) {
+    clearUI();
+    alert(`No data available for ${selectedDate}`);
+    setHistoricalStatus();
+    updateDateNavButtons(selectedDate);
+    return;
+  }
+
   stopPolling();
   loadData(selectedDate);
 
@@ -63,6 +72,7 @@ function onDateSelect() {
   updateDateNavButtons(selectedDate);
 }
 
+
 function changeDateBy(days) {
   const dateInput = document.getElementById("datePicker");
   const current = dateInput.value || getTodayDate();
@@ -72,6 +82,15 @@ function changeDateBy(days) {
 
   const newDate = formatDate(d);
   dateInput.value = newDate;
+
+  // if out of range, just show message and do NOT load data
+  if (!isDateInRange(newDate)) {
+    clearUI();
+    alert(`No data available for ${newDate}`);
+    setHistoricalStatus();
+    updateDateNavButtons(newDate);
+    return;
+  }
 
   // behave like manual selection
   stopPolling();
@@ -126,11 +145,17 @@ function loadData(dateValue) {
   query.send((response) => {
     if (response.isError()) {
       clearUI();
-      alert("No data found");
+      alert(`No data available for ${dateValue}`);
       return;
     }
 
     const data = response.getDataTable();
+    if (!data || data.getNumberOfRows() === 0) {
+      clearUI();
+      alert(`No data available for ${dateValue}`);
+      return;
+    }
+
     lastDataTable = data;
 
     drawChart(data);
@@ -144,6 +169,7 @@ function loadData(dateValue) {
     updateLastUpdatedTime();
   });
 }
+
 
 // build ticks for 60‑minute intervals on x‑axis
 function buildHourlyTicks(data) {
@@ -427,6 +453,22 @@ function getTodayDate() {
 function formatDate(d) {
   return d.toISOString().split("T")[0];
 }
+
+function isDateInRange(dateStr) {
+  // dateStr is "YYYY-MM-DD"
+  const d = new Date(dateStr);
+  if (isNaN(d)) return false;
+
+  const min = new Date('2025-11-22');      // first date that has data
+  const max = new Date(getTodayDate());    // today
+
+  min.setHours(0, 0, 0, 0);
+  max.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+
+  return d >= min && d <= max;
+}
+
 
 function downloadDashboardSection() {
   const area = document.getElementById("download-area");
