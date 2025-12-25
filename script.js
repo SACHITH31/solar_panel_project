@@ -154,10 +154,11 @@ if (lastTime instanceof Date) {
 }
 
 const options = {
-  title: 'Solar Power Generation',
+  title: 'SOLAR POWER GENERATION (Watts)',
   legend: 'none',
   curveType: 'function',
   lineWidth: 3,
+  //adding marginBotton with 10px only just down of this title
 
   chartArea: {
     left: 80,

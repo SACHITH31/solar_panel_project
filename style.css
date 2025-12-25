@@ -114,6 +114,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: 15px;
   box-shadow: 0 10px 25px rgba(0,0,0,0.08);
   min-height: 520px;
+  padding-top: 30px;
+  padding-bottom: 10px;
 }
 
 #chart_div {
