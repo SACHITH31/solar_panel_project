@@ -435,7 +435,6 @@ function downloadDashboardSection() {
     useCORS: true,
     scale: 2,            // sharp image
     backgroundColor: null,
-    padding: 10
   }).then(canvas => {
     const dataURL = canvas.toDataURL('image/png');
     const link = document.createElement('a');
