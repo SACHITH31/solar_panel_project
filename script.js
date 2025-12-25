@@ -7,8 +7,11 @@ const POLLING_INTERVAL = 120000;
 let pollingTimer = null;
 let isLive = false;
 
-// ✅ GLOBAL SET → prevents duplicate events forever
+// prevent duplicate events forever
 const detectedEventSet = new Set();
+
+// latest DataTable for responsive redraw
+let lastDataTable = null;
 
 google.charts.setOnLoadCallback(init);
 
@@ -17,6 +20,12 @@ function init() {
   document.getElementById('datePicker').value = today;
   loadData(today);
   startPolling(today);
+
+  // responsive chart: redraw on resize
+  window.addEventListener('resize', () => {
+    if (!lastDataTable) return;
+    drawChart(lastDataTable);
+  });
 }
 
 function onDateSelect() {
@@ -53,6 +62,7 @@ function loadData(dateValue) {
     }
 
     const data = response.getDataTable();
+    lastDataTable = data;
     drawChart(data);
     showLiveWatt(data);
     showTotalPower(data);
@@ -62,9 +72,28 @@ function loadData(dateValue) {
   });
 }
 
+// build ticks for 60‑minute intervals on x‑axis
+function buildHourlyTicks(data) {
+  const ticks = [];
+  for (let i = 0; i < data.getNumberOfRows(); i++) {
+    const time = data.getValue(i, 0);
+    if (time instanceof Date) {
+      const m = time.getMinutes();
+      if (m === 0) ticks.push(time);
+    } else {
+      const [h, m] = String(time).split(':').map(Number);
+      if (m === 0) ticks.push(time);
+    }
+  }
+  return ticks;
+}
+
 function drawChart(data) {
-  data.addColumn({ type: 'string', role: 'annotation' });
-  data.addColumn({ type: 'string', role: 'annotationText' });
+  // add annotation columns if not already present
+  if (data.getNumberOfColumns() === 2) {
+    data.addColumn({ type: 'string', role: 'annotation' });      // col 2
+    data.addColumn({ type: 'string', role: 'annotationText' });  // col 3
+  }
 
   const DROP_THRESHOLD = 15000;
   let lastPower = null;
@@ -84,34 +113,54 @@ function drawChart(data) {
     lastPower = power;
   }
 
-  new google.visualization.LineChart(
-    document.getElementById('chart_div')
-  ).draw(data, {
-  title: 'Solar Power Generation',
-  curveType: 'function',
-  legend: 'none',
-  lineWidth: 3,
-  hAxis: { 
-    format: 'HH:mm',
-    gridlines: { color: '#e0e0e0', count: -1 },
-    viewWindowMode: 'pretty'
-  },
-  vAxis: { 
-    minValue: 0,
-    gridlines: { color: '#e0e0e0' },
-    minorGridlines: { color: '#f5f5f5' }
-  },
+  const hourlyTicks = buildHourlyTicks(data);
 
-  // 🔴 MARKERS (annotations) IN RED
-  annotations: {
-    style: 'point',
-    textStyle: {
-      color: 'red',
-      fontSize: 14,
-      bold: true
+  const options = {
+    title: 'Solar Power Generation',
+    legend: 'none',
+    curveType: 'function',
+    lineWidth: 3,
+
+    chartArea: {
+      left: 80,
+      top: 40,
+      right: 20,
+      bottom: 60,
+      width: '85%',
+      height: '75%'
+    },
+
+    hAxis: {
+      title: 'Time',
+      format: 'HH:mm',
+      ticks: hourlyTicks,
+      gridlines: { color: '#e0e0e0', count: -1 },
+      viewWindowMode: 'pretty',
+      textStyle: { fontSize: 11 }
+    },
+
+    vAxis: {
+      title: 'Generated Power (Watts)',
+      viewWindow: { min: 0 },
+      gridlines: { color: '#e0e0e0' },
+      minorGridlines: { color: '#f5f5f5' },
+      textStyle: { fontSize: 11 }
+    },
+
+    annotations: {
+      style: 'point',
+      textStyle: {
+        color: 'red',
+        fontSize: 14,
+        bold: true
+      }
     }
-  }
-});
+  };
+
+  const chart = new google.visualization.LineChart(
+    document.getElementById('chart_div')
+  );
+  chart.draw(data, options);
 }
 
 function showLiveWatt(data) {
@@ -119,29 +168,24 @@ function showLiveWatt(data) {
   const watt = data.getValue(lastRow, 1);
   const kwh = (watt / 1000).toFixed(2);
 
-  document.getElementById('live_watt').innerHTML =
-    `⚡ Live Watt : <strong>${kwh} kWh</strong>`;
-
-  document.getElementById('live_watt').title = `Live Watt is: ${kwh}KWH`
-  document.getElementById('live_watt').style.opacity = 1; 
-  document.getElementById('live_watt').style.transition = "opacity 1s ease-in";
-  document.getElementById('live_watt').style.cursor = 'pointer' 
+  const el = document.getElementById('live_watt');
+  el.innerHTML = `⚡ Live Watt : <strong>${kwh} kWh</strong>`;
+  el.title = `Live Watt is: ${kwh} kWh`;
+  el.style.opacity = 1;
+  el.style.transition = 'opacity 1s ease-in';
+  el.style.cursor = 'pointer';
 }
 
 function showCO2Saved(totalKwh) {
   const CO2_FACTOR = 0.82; // kg per kWh
   const co2 = totalKwh * CO2_FACTOR;
 
-  document.getElementById('co2_saved').innerHTML =
-    `🌱 CO₂ Saved : <strong>${co2.toFixed(0)} kg</strong>`;
-  document.getElementById('co2_saved').title = `CO2 Saved is: ${co2.toFixed(0)} kg`
-  document.getElementById('co2_saved').style.opacity = 1; 
-  document.getElementById('co2_saved').style.transition = "opacity 1s ease-in";
-  document.getElementById('co2_saved').style.cursor = 'pointer'
-
-  // decrease the padding right just to fit better as the remaining because it's width is longer than others
-  document.getElementById('co2_saved').style.paddingRight = '-24px';
-  document.getElementById('co2_saved').style.marginRight = '-24px';
+  const el = document.getElementById('co2_saved');
+  el.innerHTML = `🌱 CO₂ Saved : <strong>${co2.toFixed(0)} kg</strong>`;
+  el.title = `CO₂ Saved is: ${co2.toFixed(0)} kg`;
+  el.style.opacity = 1;
+  el.style.transition = 'opacity 1s ease-in';
+  el.style.cursor = 'pointer';
 }
 
 function showTotalPower(data) {
@@ -152,12 +196,13 @@ function showTotalPower(data) {
 
   const totalKwh = total / 1000;
 
-  document.getElementById('total_power').innerText =
-    `☀️ Solar Energy Today : ${totalKwh.toFixed(2)} kWh`;
-  document.getElementById('total_power').title = `Solar Energy Today : ${totalKwh.toFixed(2)} kWh`
-  document.getElementById('total_power').style.opacity = 1; 
-  document.getElementById('total_power').style.transition = "opacity 1s ease-in";
-  document.getElementById('total_power').style.cursor = 'pointer'
+  const el = document.getElementById('total_power');
+  el.innerHTML = `☀️ Solar Energy Today : <strong>${totalKwh.toFixed(2)} kWh</strong>`;
+  el.title = `Solar Energy Today : ${totalKwh.toFixed(2)} kWh`;
+  el.style.opacity = 1;
+  el.style.transition = 'opacity 1s ease-in';
+  el.style.cursor = 'pointer';
+
   showCO2Saved(totalKwh);
 }
 
@@ -176,13 +221,12 @@ function updateInverterHealth(data) {
 
   const health = maxDropPercent === 0 ? 100 : (100 - maxDropPercent).toFixed(1);
 
-  document.getElementById('inverter-health').innerHTML =
-    `🟢 Inverter Health : <strong>${health}%</strong>`;
-  
-  document.getElementById('inverter-health').title = `Inverter Health is: ${health}%`
-  document.getElementById('inverter-health').style.opacity = 1; 
-  document.getElementById('inverter-health').style.transition = "opacity 1s ease-in";
-  document.getElementById('inverter-health').style.cursor = 'pointer'
+  const el = document.getElementById('inverter-health');
+  el.innerHTML = `🟢 Inverter Health : <strong>${health}%</strong>`;
+  el.title = `Inverter Health is: ${health}%`;
+  el.style.opacity = 1;
+  el.style.transition = 'opacity 1s ease-in';
+  el.style.cursor = 'pointer';
 }
 
 function detectPowerEvents(data) {
@@ -195,7 +239,7 @@ function detectPowerEvents(data) {
 
     if (lastPower && lastPower - power > DROP_THRESHOLD) {
       const dropPercent = (((lastPower - power) / lastPower) * 100).toFixed(1);
-      const eventKey = `${time}-${dropPercent}`;
+      const eventKey = `${time} - Drop ${dropPercent}%`;
 
       if (!detectedEventSet.has(eventKey)) {
         detectedEventSet.add(eventKey);
@@ -210,16 +254,27 @@ function detectPowerEvents(data) {
 function displayEvents() {
   const container = document.getElementById('events');
   container.innerHTML = '';
-  if (detectedEventSet.size === 0) return;
 
-  container.innerHTML = '<strong>⚠ Detected Power Drop Events:</strong><br>';
+  if (detectedEventSet.size === 0) {
+    container.innerHTML =
+      '✅ No power drop events detected for this period.';
+    return;
+  }
 
+  const title = document.createElement('strong');
+  title.textContent = '⚠ Detected Power Drop Events:';
+  container.appendChild(title);
+  container.appendChild(document.createElement('br'));
+
+  const ul = document.createElement('ul');
   detectedEventSet.forEach(e => {
     const li = document.createElement('li');
     li.textContent = e;
-    container.appendChild(li);
+    ul.appendChild(li);
   });
+  container.appendChild(ul);
 }
+
 
 function updateLastUpdatedTime() {
   document.getElementById('last_updated').innerHTML =
@@ -238,7 +293,7 @@ function stopPolling() {
 
 function setLiveStatus() {
   document.getElementById('status').innerHTML =
-    `<span class="live-dot"></span> LIVE (auto-updating every 2 minutes)`;
+    `<span class="live-dot"></span><span>LIVE (auto-updating every 2 minutes)</span>`;
 }
 
 function setHistoricalStatus() {

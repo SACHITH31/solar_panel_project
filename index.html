@@ -2,98 +2,58 @@
 <html>
 <head>
   <title>Solar Panel Efficiency</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/charts/loader.js"></script>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-
-    #chart_div {
-      width: 100%;
-      height: 500px;
-      margin-top: 20px;
-    }
-
-    #total_power {
-      margin-top: 15px;
-      font-size: 18px;
-      font-weight: bold;
-    }
-
-    #status {
-      margin-top: 10px;
-      font-size: 14px;
-      color: green;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .live-dot {
-      width: 10px;
-      height: 10px;
-      background-color: green;
-      border-radius: 50%;
-      animation: blink 1s infinite;
-    }
-
-    @keyframes blink {
-      0% { opacity: 1; }
-      50% { opacity: 0.2; }
-      100% { opacity: 1; }
-    }
-
-    #last_updated {
-      font-size: 13px;
-      color: #555;
-      margin-bottom: 10px;
-    }
-    #chart_div svg {
-      cursor: pointer;
-    }
-    /* or 
-    g rect {
-      cursor: pointer;
-    } */
-
-  </style>
 </head>
 <body>
 
   <div class="dashboard-container">
-    <h2 style="text-align: center;">GPREC EEE_BLOCK_1 SOLAR DATA</h2>
-    <div class="controls-card">
+
+    <!-- Header -->
+    <header class="dashboard-header">
+      <h2>GPREC EEE_BLOCK_1 SOLAR DATA</h2>
+    </header>
+
+    <!-- Filters / Controls -->
+    <section class="controls-card">
       <input type="date" id="datePicker">
       <button onclick="onDateSelect()">OK</button>
-      <div id="status"><span class="live-dot"></span></div>
+
+      <div id="status">
+        <span class="live-dot"></span>
+        <span>LIVE (auto-updating every 2 minutes)</span>
+      </div>
+
       <div id="last_updated"></div>
-  </div>
+    </section>
 
-  
-  <div class="chart-card">
-    <div id="chart_div"></div>
-  </div>
-    
-  <div class="info-cards">
-    <div id="custom_legend" style="margin-top:8px;font-size:14px; background-color: rgb(250, 235, 215); padding: 10px;">
-      <span style="color:red;font-weight:bold;">⚠</span>
-      Sudden power drop detected (possible outage / inverter issue)
-    </div>
-  </div>
+    <!-- Main Chart -->
+    <section class="chart-card">
+      <div id="chart_div"></div>
+    </section>
 
-  <div class="detailsCardContainer">
-    <div id="live_watt" class="live-watt-card"></div>
-    <div id="total_power" class="power-card"></div>
-    <div id="inverter-health" class="inverter-health-card"></div>
-    <div id="co2_saved" class="co2-card"></div>
+    <!-- Alerts / Legend -->
+    <section class="info-cards">
+      <div id="custom_legend" class="alert-card">
+        <span class="alert-icon">⚠</span>
+        <span>Sudden power drop detected (possible outage / inverter issue)</span>
+      </div>
+    </section>
+
+    <!-- Summary Cards -->
+    <section class="detailsCardContainer">
+      <div id="live_watt" class="summary-card"></div>
+      <div id="total_power" class="summary-card"></div>
+      <div id="inverter-health" class="summary-card"></div>
+      <div id="co2_saved" class="summary-card"></div>
+    </section>
+
+    <!-- Events -->
+    <section id="events" class="event-card"></section>
+
   </div>
-
-
-  <div id="events" class="event-card" style="margin-top:10px;color:#b00020;font-size:14px;"></div>
 
   <script src="script.js"></script>
 </body>
