@@ -447,27 +447,37 @@ function downloadDashboardSection() {
   });
 }
 
+function getLastNonNullInColumn(data, colIndex) {
+  for (let row = data.getNumberOfRows() - 1; row >= 0; row--) {
+    const v = data.getValue(row, colIndex);
+    if (v !== null && v !== undefined && v !== '') {
+      return v;
+    }
+  }
+  return null;
+}
+
 function updateLatestMetricsTable(data) {
-  const tbody = document.querySelector("#latestMetricsTable tbody");
+  const tbody = document.querySelector('#latestMetricsTable tbody');
   if (!tbody) return;
 
-  tbody.innerHTML = "";
+  tbody.innerHTML = '';
 
-  const lastRowIndex = data.getNumberOfRows() - 1;
-  if (lastRowIndex < 0) return;
+  METRIC_COLUMNS.forEach(col => {
+    const value = getLastNonNullInColumn(data, col.index);
 
-  METRIC_COLUMNS.forEach((col) => {
-    const value = data.getValue(lastRowIndex, col.index);
-    const tr = document.createElement("tr");
+    const tr = document.createElement('tr');
 
-    const nameTd = document.createElement("td");
+    const nameTd = document.createElement('td');
     nameTd.textContent = col.label;
 
-    const valueTd = document.createElement("td");
-    valueTd.textContent = value !== null && value !== undefined ? value : "--";
+    const valueTd = document.createElement('td');
+    valueTd.textContent =
+      value !== null && value !== undefined && value !== '' ? value : '--';
 
     tr.appendChild(nameTd);
     tr.appendChild(valueTd);
     tbody.appendChild(tr);
   });
 }
+
