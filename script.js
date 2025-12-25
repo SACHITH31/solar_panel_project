@@ -91,8 +91,16 @@ function drawChart(data) {
   curveType: 'function',
   legend: 'none',
   lineWidth: 3,
-  hAxis: { format: 'HH:mm' },
-  vAxis: { minValue: 0 },
+  hAxis: { 
+    format: 'HH:mm',
+    gridlines: { color: '#e0e0e0', count: -1 },
+    viewWindowMode: 'pretty'
+  },
+  vAxis: { 
+    minValue: 0,
+    gridlines: { color: '#e0e0e0' },
+    minorGridlines: { color: '#f5f5f5' }
+  },
 
   // 🔴 MARKERS (annotations) IN RED
   annotations: {
