@@ -29,11 +29,20 @@
 
       <div id="last_updated"></div>
       
-      <div class="date-nav-buttons">
-        <button id="prevDateBtn" class="nav-date-btn" onclick="goToPreviousDate()">Previous Date</button>
-        <input type="date" id="todayDisplay" class="static-date" disabled>
-        <button id="nextDateBtn" class="nav-date-btn" onclick="goToNextDate()">Next Date</button>
-      </div>
+      <div class="date-nav-group">
+  <button id="prevDateBtn" class="nav-date-btn" onclick="goToPreviousDate()">
+    <span class="icon">⟨</span>
+    <span>Previous</span>
+  </button>
+
+  <input type="date" id="todayDisplay" class="static-date" disabled>
+
+  <button id="nextDateBtn" class="nav-date-btn" onclick="goToNextDate()">
+    <span>Next</span>
+    <span class="icon">⟩</span>
+  </button>
+</div>
+
 
     </section>
 

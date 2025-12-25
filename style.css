@@ -311,3 +311,79 @@ section#events {
 .static-date:disabled {
   opacity: 1;
 }
+.date-nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #d0d7e2;
+  background: linear-gradient(135deg, #f8fafc, #eef2ff);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+/* left/right buttons */
+.nav-date-btn {
+  padding: 10px 16px;
+  font-size: 15px;
+  border: none;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.2px;
+}
+
+.nav-date-btn span.icon {
+  font-size: 14px;
+}
+
+.nav-date-btn:first-child {
+  border-right: 1px solid #e2e8f0;
+}
+
+.nav-date-btn:last-child {
+  border-left: 1px solid #e2e8f0;
+}
+
+/* hover + focus */
+.nav-date-btn:not(:disabled):hover {
+  background: #0ea5e9;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(14, 165, 233, 0.35);
+}
+
+.nav-date-btn:not(:disabled):focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+/* disabled */
+.nav-date-btn:disabled {
+  background: transparent;
+  color: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* center “Today” display */
+#todayDisplay {
+  border: none;
+  background: transparent;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: default;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  margin: 0 2px;
+  cursor: not-allowed;
+}
+
+#todayDisplay::-webkit-calendar-picker-indicator {
+  display: none;
+}

@@ -21,6 +21,7 @@ function init() {
 
   // set disabled today display
   document.getElementById('todayDisplay').value = today;
+  document.getElementById('todayDisplay').title = `Today is ${today}`;
 
   loadData(today);
   startPolling(today);
