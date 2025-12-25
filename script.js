@@ -121,6 +121,11 @@ function showLiveWatt(data) {
 
   document.getElementById('live_watt').innerHTML =
     `⚡ Live Watt : <strong>${kwh} kWh</strong>`;
+
+  document.getElementById('live_watt').title = `Live Watt is: ${kwh}KWH`
+  document.getElementById('live_watt').style.opacity = 1; 
+  document.getElementById('live_watt').style.transition = "opacity 1s ease-in";
+  document.getElementById('live_watt').style.cursor = 'pointer' 
 }
 
 function showCO2Saved(totalKwh) {
@@ -129,6 +134,10 @@ function showCO2Saved(totalKwh) {
 
   document.getElementById('co2_saved').innerHTML =
     `🌱 CO₂ Saved : <strong>${co2.toFixed(0)} kg</strong>`;
+  document.getElementById('co2_saved').title = `CO2 Saved is: ${co2.toFixed(0)} kg`
+  document.getElementById('co2_saved').style.opacity = 1; 
+  document.getElementById('co2_saved').style.transition = "opacity 1s ease-in";
+  document.getElementById('co2_saved').style.cursor = 'pointer'
 }
 
 function showTotalPower(data) {
@@ -141,7 +150,10 @@ function showTotalPower(data) {
 
   document.getElementById('total_power').innerText =
     `☀️ Solar Energy Today : ${totalKwh.toFixed(2)} kWh`;
-
+  document.getElementById('total_power').title = `Solar Energy Today : ${totalKwh.toFixed(2)} kWh`
+  document.getElementById('total_power').style.opacity = 1; 
+  document.getElementById('total_power').style.transition = "opacity 1s ease-in";
+  document.getElementById('total_power').style.cursor = 'pointer'
   showCO2Saved(totalKwh);
 }
 
@@ -162,6 +174,11 @@ function updateInverterHealth(data) {
 
   document.getElementById('inverter-health').innerHTML =
     `🟢 Inverter Health : <strong>${health}%</strong>`;
+  
+  document.getElementById('inverter-health').title = `Inverter Health is: ${health}%`
+  document.getElementById('inverter-health').style.opacity = 1; 
+  document.getElementById('inverter-health').style.transition = "opacity 1s ease-in";
+  document.getElementById('inverter-health').style.cursor = 'pointer'
 }
 
 function detectPowerEvents(data) {
