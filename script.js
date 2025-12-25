@@ -46,21 +46,27 @@ function init() {
 }
 
 function onDateSelect() {
-  const selectedDate = document.getElementById("datePicker").value;
+  const dateInput = document.getElementById("datePicker");
+  const selectedDate = dateInput.value;
   if (!selectedDate) {
     alert("Please select a date");
     return;
   }
 
-  // block dates outside valid range
+  // if date is outside valid range, show message and load TODAY instead
   if (!isDateInRange(selectedDate)) {
-    clearUI();
-    alert(`No data available for ${selectedDate}`);
-    setHistoricalStatus();
-    updateDateNavButtons(selectedDate);
+    alert(`No data available for ${selectedDate}. Showing today's data.`);
+    const today = getTodayDate();
+    dateInput.value = today;
+
+    stopPolling();
+    loadData(today);
+    startPolling(today);          // today is LIVE
+    updateDateNavButtons(today);
     return;
   }
 
+  // normal valid date flow
   stopPolling();
   loadData(selectedDate);
 
@@ -455,11 +461,10 @@ function formatDate(d) {
 }
 
 function isDateInRange(dateStr) {
-  // dateStr is "YYYY-MM-DD"
   const d = new Date(dateStr);
   if (isNaN(d)) return false;
 
-  const min = new Date('2025-11-22');      // first date that has data
+  const min = new Date('2025-11-22');      // first date with data
   const max = new Date(getTodayDate());    // today
 
   min.setHours(0, 0, 0, 0);
@@ -468,6 +473,7 @@ function isDateInRange(dateStr) {
 
   return d >= min && d <= max;
 }
+
 
 
 function downloadDashboardSection() {
