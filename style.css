@@ -269,3 +269,45 @@ section#events {
   transform: translateY(-2px);
   box-shadow: 0px 6px 12px rgba(0, 114, 255, 0.3);
 }
+  
+  /* Small previous/next date buttons */
+.nav-date-btn {
+  padding: 10px 12px;
+  font-size: 16px;
+  border-radius: 12px;
+  border: 1px solid #201f1f;
+  background: #ffffff;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-date-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nav-date-btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0px 6px 12px rgba(0, 114, 255, 0.15);
+}
+
+.static-date {
+  margin-left: 0px !important;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 1px solid rgb(59, 58, 58);
+  border-radius: 5px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  cursor: not-allowed;
+}
+
+.static-date::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.static-date:disabled {
+  opacity: 1;
+}

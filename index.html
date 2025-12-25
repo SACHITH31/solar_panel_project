@@ -18,15 +18,23 @@
 
     <!-- Filters / Controls -->
     <section class="controls-card">
+
       <input type="date" id="datePicker">
       <button onclick="onDateSelect()" class="okButton">OK</button>
-
+            
       <div id="status">
         <span class="live-dot"></span>
         <span>LIVE (auto-updating every 2 minutes)</span>
       </div>
 
       <div id="last_updated"></div>
+      
+      <div class="date-nav-buttons">
+        <button id="prevDateBtn" class="nav-date-btn" onclick="goToPreviousDate()">Previous Date</button>
+        <input type="date" id="todayDisplay" class="static-date" disabled>
+        <button id="nextDateBtn" class="nav-date-btn" onclick="goToNextDate()">Next Date</button>
+      </div>
+
     </section>
 
     <!-- Main Chart -->

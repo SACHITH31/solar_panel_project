@@ -18,15 +18,20 @@ google.charts.setOnLoadCallback(init);
 function init() {
   const today = getTodayDate();
   document.getElementById('datePicker').value = today;
+
+  // set disabled today display
+  document.getElementById('todayDisplay').value = today;
+
   loadData(today);
   startPolling(today);
+  updateDateNavButtons(today);
 
-  // responsive chart: redraw on resize
   window.addEventListener('resize', () => {
     if (!lastDataTable) return;
     drawChart(lastDataTable);
   });
 }
+
 
 function onDateSelect() {
   const selectedDate = document.getElementById('datePicker').value;
@@ -43,7 +48,56 @@ function onDateSelect() {
   } else {
     setHistoricalStatus();
   }
+  updateDateNavButtons(selectedDate);
 }
+
+function changeDateBy(days) {
+  const dateInput = document.getElementById('datePicker');
+  const current = dateInput.value || getTodayDate();
+
+  const d = new Date(current);
+  d.setDate(d.getDate() + days);
+
+  const newDate = formatDate(d);
+  dateInput.value = newDate;
+
+  // behave like manual selection
+  stopPolling();
+  loadData(newDate);
+
+  if (newDate === getTodayDate()) {
+    startPolling(newDate);
+  } else {
+    setHistoricalStatus();
+  }
+
+  updateDateNavButtons(newDate);
+}
+
+function goToPreviousDate() {
+  changeDateBy(-1);
+}
+
+function goToNextDate() {
+  changeDateBy(1);
+}
+
+// enable/disable prev/next according to today
+function updateDateNavButtons(selectedDate) {
+  const today = getTodayDate();
+  const prevBtn = document.getElementById('prevDateBtn');
+  const nextBtn = document.getElementById('nextDateBtn');
+
+  // next disabled if selected date is today or in future
+  const sel = new Date(selectedDate);
+  const todayDate = new Date(today);
+
+  nextBtn.disabled = sel >= todayDate;
+
+  // previous always enabled unless you want a lower bound
+  prevBtn.disabled = false;
+}
+
 
 function loadData(dateValue) {
   const sheetName = SHEET_PREFIX + dateValue;
@@ -366,4 +420,8 @@ function clearUI() {
 
 function getTodayDate() {
   return new Date().toISOString().split('T')[0];
+}
+
+function formatDate(d) {
+  return d.toISOString().split('T')[0];
 }
