@@ -387,3 +387,7 @@ section#events {
 #todayDisplay::-webkit-calendar-picker-indicator {
   display: none;
 }
+
+div#custom_legend {
+    margin-top: 15px;
+}

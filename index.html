@@ -1,77 +1,89 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Solar Panel Efficiency</title>
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css">
-  <script src="https://www.gstatic.com/charts/loader.js"></script>
-</head>
-<body>
+  <head>
+    <title>Solar Panel Efficiency</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  </head>
+  <body>
+    <div class="dashboard-container">
+      <!-- Header -->
+      <header class="dashboard-header">
+        <h2>GPREC EEE_BLOCK_1 SOLAR DATA</h2>
+      </header>
 
-  <div class="dashboard-container">
+      <!-- Filters / Controls -->
+      <section class="controls-card">
+        <input type="date" id="datePicker" />
+        <button onclick="onDateSelect()" class="okButton">OK</button>
 
-    <!-- Header -->
-    <header class="dashboard-header">
-      <h2>GPREC EEE_BLOCK_1 SOLAR DATA</h2>
-    </header>
+        <div id="status">
+          <span class="live-dot"></span>
+          <span>LIVE (auto-updating every 2 minutes)</span>
+        </div>
 
-    <!-- Filters / Controls -->
-    <section class="controls-card">
+        <div id="last_updated"></div>
 
-      <input type="date" id="datePicker">
-      <button onclick="onDateSelect()" class="okButton">OK</button>
-            
-      <div id="status">
-        <span class="live-dot"></span>
-        <span>LIVE (auto-updating every 2 minutes)</span>
+        <div class="date-nav-group">
+          <button
+            id="prevDateBtn"
+            class="nav-date-btn"
+            onclick="goToPreviousDate()"
+          >
+            <span class="icon">⟨</span>
+            <span>Previous</span>
+          </button>
+
+          <input type="date" id="todayDisplay" class="static-date" disabled />
+
+          <button
+            id="nextDateBtn"
+            class="nav-date-btn"
+            onclick="goToNextDate()"
+          >
+            <span>Next</span>
+            <span class="icon">⟩</span>
+          </button>
+        </div>
+        <button id="downloadBtn" onclick="downloadDashboardSection()">
+          Download View
+        </button>
+      </section>
+
+      <!-- Main Chart -->
+      <div id="download-area">
+        <section class="chart-card">
+          <div id="chart_div"></div>
+        </section>
+
+        <!-- Alerts / Legend -->
+        <section class="info-cards">
+          <div id="custom_legend" class="alert-card">
+            <span class="alert-icon">⚠</span>
+            <span
+              >Sudden power drop detected (possible outage / inverter
+              issue)</span
+            >
+          </div>
+        </section>
+
+        <!-- Summary Cards -->
+        <section class="detailsCardContainer">
+          <div id="live_watt" class="summary-card"></div>
+          <div id="total_power" class="summary-card"></div>
+          <div id="inverter-health" class="summary-card"></div>
+          <div id="co2_saved" class="summary-card"></div>
+        </section>
       </div>
+      <!-- Events -->
+      <section id="events" class="event-card"></section>
+    </div>
 
-      <div id="last_updated"></div>
-      
-      <div class="date-nav-group">
-  <button id="prevDateBtn" class="nav-date-btn" onclick="goToPreviousDate()">
-    <span class="icon">⟨</span>
-    <span>Previous</span>
-  </button>
-
-  <input type="date" id="todayDisplay" class="static-date" disabled>
-
-  <button id="nextDateBtn" class="nav-date-btn" onclick="goToNextDate()">
-    <span>Next</span>
-    <span class="icon">⟩</span>
-  </button>
-</div>
-
-
-    </section>
-
-    <!-- Main Chart -->
-    <section class="chart-card">
-      <div id="chart_div"></div>
-    </section>
-
-    <!-- Alerts / Legend -->
-    <section class="info-cards">
-      <div id="custom_legend" class="alert-card">
-        <span class="alert-icon">⚠</span>
-        <span>Sudden power drop detected (possible outage / inverter issue)</span>
-      </div>
-    </section>
-
-    <!-- Summary Cards -->
-    <section class="detailsCardContainer">
-      <div id="live_watt" class="summary-card"></div>
-      <div id="total_power" class="summary-card"></div>
-      <div id="inverter-health" class="summary-card"></div>
-      <div id="co2_saved" class="summary-card"></div>
-    </section>
-
-    <!-- Events -->
-    <section id="events" class="event-card"></section>
-
-  </div>
-
-  <script src="script.js"></script>
-</body>
+    <script src="script.js"></script>
+  </body>
 </html>

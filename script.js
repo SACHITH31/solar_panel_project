@@ -426,3 +426,23 @@ function getTodayDate() {
 function formatDate(d) {
   return d.toISOString().split('T')[0];
 }
+
+function downloadDashboardSection() {
+  const area = document.getElementById('download-area');
+  if (!area) return;
+
+  html2canvas(area, {
+    useCORS: true,
+    scale: 2,            // sharp image
+    backgroundColor: null,
+    padding: 10
+  }).then(canvas => {
+    const dataURL = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.href = dataURL;
+    link.download = `solar-dashboard-${getTodayDate()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
