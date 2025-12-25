@@ -138,6 +138,10 @@ function showCO2Saved(totalKwh) {
   document.getElementById('co2_saved').style.opacity = 1; 
   document.getElementById('co2_saved').style.transition = "opacity 1s ease-in";
   document.getElementById('co2_saved').style.cursor = 'pointer'
+
+  // decrease the padding right just to fit better as the remaining because it's width is longer than others
+  document.getElementById('co2_saved').style.paddingRight = '-24px';
+  document.getElementById('co2_saved').style.marginRight = '-24px';
 }
 
 function showTotalPower(data) {
