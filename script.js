@@ -1,7 +1,7 @@
-google.charts.load('current', { packages: ['corechart'] });
+google.charts.load("current", { packages: ["corechart"] });
 
-const SPREADSHEET_ID = '1AdBjvpwcuAPetNtZXWR1nWwQTdbLCpslQ6xWbcPr5M0';
-const SHEET_PREFIX = 'EEE Block-1 Solar Data_Slave_1_';
+const SPREADSHEET_ID = "1AdBjvpwcuAPetNtZXWR1nWwQTdbLCpslQ6xWbcPr5M0";
+const SHEET_PREFIX = "EEE Block-1 Solar Data_Slave_1_";
 const POLLING_INTERVAL = 120000;
 
 let pollingTimer = null;
@@ -13,31 +13,42 @@ const detectedEventSet = new Set();
 // latest DataTable for responsive redraw
 let lastDataTable = null;
 
+// Columns used for "Latest Inverter Metrics" table
+// (index values are positions in the DataTable from the SELECT above)
+const METRIC_COLUMNS = [
+  { label: "PF Avg (inst) [F]", index: 2 },
+  { label: "VA Total [J]", index: 3 },
+  { label: "VL N Average (A) [N]", index: 4 },
+  { label: "Current Total [V]", index: 5 },
+  { label: "Frequency [Z]", index: 6 },
+  { label: "Wh [AA]", index: 7 },
+  { label: "VAh [AB]", index: 8 },
+];
+
 google.charts.setOnLoadCallback(init);
 
 function init() {
   const today = getTodayDate();
-  document.getElementById('datePicker').value = today;
+  document.getElementById("datePicker").value = today;
 
   // set disabled today display
-  document.getElementById('todayDisplay').value = today;
-  document.getElementById('todayDisplay').title = `Today is ${today}`;
+  document.getElementById("todayDisplay").value = today;
+  document.getElementById("todayDisplay").title = `Today is ${today}`;
 
   loadData(today);
   startPolling(today);
   updateDateNavButtons(today);
 
-  window.addEventListener('resize', () => {
+  window.addEventListener("resize", () => {
     if (!lastDataTable) return;
     drawChart(lastDataTable);
   });
 }
 
-
 function onDateSelect() {
-  const selectedDate = document.getElementById('datePicker').value;
+  const selectedDate = document.getElementById("datePicker").value;
   if (!selectedDate) {
-    alert('Please select a date');
+    alert("Please select a date");
     return;
   }
 
@@ -53,7 +64,7 @@ function onDateSelect() {
 }
 
 function changeDateBy(days) {
-  const dateInput = document.getElementById('datePicker');
+  const dateInput = document.getElementById("datePicker");
   const current = dateInput.value || getTodayDate();
 
   const d = new Date(current);
@@ -86,8 +97,8 @@ function goToNextDate() {
 // enable/disable prev/next according to today
 function updateDateNavButtons(selectedDate) {
   const today = getTodayDate();
-  const prevBtn = document.getElementById('prevDateBtn');
-  const nextBtn = document.getElementById('nextDateBtn');
+  const prevBtn = document.getElementById("prevDateBtn");
+  const nextBtn = document.getElementById("nextDateBtn");
 
   // next disabled if selected date is today or in future
   const sel = new Date(selectedDate);
@@ -99,20 +110,23 @@ function updateDateNavButtons(selectedDate) {
   prevBtn.disabled = false;
 }
 
-
 function loadData(dateValue) {
   const sheetName = SHEET_PREFIX + dateValue;
 
   const query = new google.visualization.Query(
-    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
+      sheetName
+    )}`
   );
 
-  query.setQuery(`SELECT A, B WHERE A IS NOT NULL AND B IS NOT NULL`);
+  query.setQuery(
+    `SELECT A, B, F, J, N, V, Z, AA, AB WHERE A IS NOT NULL AND B IS NOT NULL`
+  );
 
-  query.send(response => {
+  query.send((response) => {
     if (response.isError()) {
       clearUI();
-      alert('No data found');
+      alert("No data found");
       return;
     }
 
@@ -123,12 +137,11 @@ function loadData(dateValue) {
     showLiveWatt(data);
     showTotalPower(data);
     updateInverterHealth(data);
+    updateLatestMetricsTable(data);
 
-    detectedEventSet.clear();      // clear old events for previous date
-
+    detectedEventSet.clear();
     detectPowerEvents(data);
     updateLastUpdatedTime();
-
   });
 }
 
@@ -139,9 +152,9 @@ function buildHourlyTicks(data) {
   let lastTime = data.getValue(data.getNumberOfRows() - 1, 0);
 
   // normalize to Date
-  const toDate = t => {
+  const toDate = (t) => {
     if (t instanceof Date) return new Date(t.getTime());
-    const [h, m] = String(t).split(':').map(Number);
+    const [h, m] = String(t).split(":").map(Number);
     const d = new Date();
     d.setHours(h, m || 0, 0, 0);
     return d;
@@ -165,114 +178,98 @@ function buildHourlyTicks(data) {
   return ticks;
 }
 
-
 function drawChart(data) {
-  // add annotation columns if not already present
-  if (data.getNumberOfColumns() === 2) {
-    data.addColumn({ type: 'string', role: 'annotation' });      // col 2
-    data.addColumn({ type: 'string', role: 'annotationText' });  // col 3
+  // ensure annotation columns at end
+  let currentCols = data.getNumberOfColumns();
+  let annotationColIndex, annotationTextColIndex;
+
+  if (currentCols === 9) {
+    annotationColIndex = currentCols;
+    annotationTextColIndex = currentCols + 1;
+    data.addColumn({ type: "string", role: "annotation" });
+    data.addColumn({ type: "string", role: "annotationText" });
+    currentCols = data.getNumberOfColumns();
+  } else {
+    annotationColIndex = currentCols - 2;
+    annotationTextColIndex = currentCols - 1;
   }
 
   const DROP_THRESHOLD = 15000;
   let lastPower = null;
 
   for (let i = 0; i < data.getNumberOfRows(); i++) {
-    const power = data.getValue(i, 1);
+    const power = data.getValue(i, 1); // Watts Total
     let marker = null;
     let text = null;
 
     if (lastPower !== null && lastPower - power > DROP_THRESHOLD) {
-      marker = '⚠';
-      text = 'Sudden Power Drop';
+      marker = "⚠";
+      text = "Sudden Power Drop";
     }
 
-    data.setValue(i, 2, marker);
-    data.setValue(i, 3, text);
+    data.setValue(i, annotationColIndex, marker);
+    data.setValue(i, annotationTextColIndex, text);
     lastPower = power;
   }
 
   const hourlyTicks = buildHourlyTicks(data);
-  // find last time value (assumes column 0 is Date or "HH:MM")
-let lastTime = data.getValue(data.getNumberOfRows() - 1, 0);
-let viewWindowMax = null;
 
-if (lastTime instanceof Date) {
-  viewWindowMax = new Date(lastTime.getTime());
-  viewWindowMax.setHours(viewWindowMax.getHours() + 1);
-} else {
-  // string like "10:00"
-  const [h, m] = String(lastTime).split(':').map(Number);
-  const d = new Date();
-  d.setHours(h, m || 0, 0, 0);
-  d.setHours(d.getHours() + 1);
-  viewWindowMax = d;                 // Google Charts can use Date here
-}
+  const options = {
+    title: "SOLAR POWER GENERATION (Watts)",
+    legend: "none",
+    curveType: "function",
+    lineWidth: 3,
+    chartArea: {
+      left: 80,
+      top: 50,
+      right: 20,
+      bottom: 70,
+      width: "85%",
+      height: "75%",
+    },
+    titleTextStyle: {
+      fontSize: 18,
+      bold: true,
+    },
+    hAxis: {
+      title: "Time",
+      format: "HH:mm",
+      ticks: hourlyTicks,
+      gridlines: { color: "#e0e0e0", count: -1 },
+      viewWindowMode: "explicit",
+      viewWindow: {
+        min: hourlyTicks[0],
+        max: hourlyTicks[hourlyTicks.length - 1],
+      },
+      textStyle: { fontSize: 13 },
+      titleTextStyle: { fontSize: 14, italic: true },
+    },
+    vAxis: {
+      title: "Generated Power (Watts)",
+      viewWindow: { min: 0 },
+      gridlines: { color: "#e0e0e0" },
+      minorGridlines: { color: "#f5f5f5" },
+      textStyle: { fontSize: 13 },
+      titleTextStyle: { fontSize: 14, italic: true },
+    },
+    annotations: {
+      style: "point",
+      textStyle: {
+        color: "red",
+        fontSize: 16,
+        bold: true,
+      },
+    },
+  };
 
-const options = {
-  title: 'SOLAR POWER GENERATION (Watts)',
-  legend: 'none',
-  curveType: 'function',
-  lineWidth: 3,
-  //adding marginBotton with 10px only just down of this title
-
-  chartArea: {
-    left: 80,
-    top: 50,
-    right: 20,
-    bottom: 70,
-    width: '85%',
-    height: '75%'
-  },
-
-  // Chart title
-  titleTextStyle: {
-    fontSize: 18,
-    bold: true
-  },
-
-  // X axis (time)
-hAxis: {
-  title: 'Time',
-  format: 'HH:mm',
-  ticks: hourlyTicks,
-  gridlines: { color: '#e0e0e0', count: -1 },
-  viewWindowMode: 'explicit',
-  viewWindow: {
-    min: hourlyTicks[0],
-    max: hourlyTicks[hourlyTicks.length - 1]   // last tick, e.g., 11:00
-  },
-  textStyle: { fontSize: 13 },
-  titleTextStyle: { fontSize: 14, italic: true }
-},
-
-
-
-  // Y axis (power)
-  vAxis: {
-    title: 'Generated Power (Watts)',
-    viewWindow: { min: 0 },
-    gridlines: { color: '#e0e0e0' },
-    minorGridlines: { color: '#f5f5f5' },
-    textStyle: { fontSize: 13 },             // y‑axis labels
-    titleTextStyle: { fontSize: 14, italic: true }
-  },
-
-  // Red warning markers
-  annotations: {
-    style: 'point',
-    textStyle: {
-      color: 'red',
-      fontSize: 16,
-      bold: true
-    }
-  }
-};
-
+  // Only show Timestamp, Watts Total, annotation, annotationText in the chart
+  const view = new google.visualization.DataView(data);
+  view.setColumns([0, 1, annotationColIndex, annotationTextColIndex]);
 
   const chart = new google.visualization.LineChart(
-    document.getElementById('chart_div')
+    document.getElementById("chart_div")
   );
-  chart.draw(data, options);
+  chart.draw(view, options);
 }
 
 function showLiveWatt(data) {
@@ -280,24 +277,24 @@ function showLiveWatt(data) {
   const watt = data.getValue(lastRow, 1);
   const kwh = (watt / 1000).toFixed(2);
 
-  const el = document.getElementById('live_watt');
+  const el = document.getElementById("live_watt");
   el.innerHTML = `⚡ Live Watt : <strong>${kwh} kWh</strong>`;
   el.title = `Live Watt is: ${kwh} kWh`;
   el.style.opacity = 1;
-  el.style.transition = 'opacity 1s ease-in';
-  el.style.cursor = 'pointer';
+  el.style.transition = "opacity 1s ease-in";
+  el.style.cursor = "pointer";
 }
 
 function showCO2Saved(totalKwh) {
   const CO2_FACTOR = 0.82; // kg per kWh
   const co2 = totalKwh * CO2_FACTOR;
 
-  const el = document.getElementById('co2_saved');
+  const el = document.getElementById("co2_saved");
   el.innerHTML = `🌱 CO₂ Saved : <strong>${co2.toFixed(0)} kg</strong>`;
   el.title = `CO₂ Saved is: ${co2.toFixed(0)} kg`;
   el.style.opacity = 1;
-  el.style.transition = 'opacity 1s ease-in';
-  el.style.cursor = 'pointer';
+  el.style.transition = "opacity 1s ease-in";
+  el.style.cursor = "pointer";
 }
 
 function showTotalPower(data) {
@@ -308,12 +305,14 @@ function showTotalPower(data) {
 
   const totalKwh = total / 1000;
 
-  const el = document.getElementById('total_power');
-  el.innerHTML = `☀️ Solar Energy Today : <strong>${totalKwh.toFixed(2)} kWh</strong>`;
+  const el = document.getElementById("total_power");
+  el.innerHTML = `☀️ Solar Energy Today : <strong>${totalKwh.toFixed(
+    2
+  )} kWh</strong>`;
   el.title = `Solar Energy Today : ${totalKwh.toFixed(2)} kWh`;
   el.style.opacity = 1;
-  el.style.transition = 'opacity 1s ease-in';
-  el.style.cursor = 'pointer';
+  el.style.transition = "opacity 1s ease-in";
+  el.style.cursor = "pointer";
 
   showCO2Saved(totalKwh);
 }
@@ -333,12 +332,12 @@ function updateInverterHealth(data) {
 
   const health = maxDropPercent === 0 ? 100 : (100 - maxDropPercent).toFixed(1);
 
-  const el = document.getElementById('inverter-health');
+  const el = document.getElementById("inverter-health");
   el.innerHTML = `🟢 Inverter Health : <strong>${health}%</strong>`;
   el.title = `Inverter Health is: ${health}%`;
   el.style.opacity = 1;
-  el.style.transition = 'opacity 1s ease-in';
-  el.style.cursor = 'pointer';
+  el.style.transition = "opacity 1s ease-in";
+  el.style.cursor = "pointer";
 }
 
 function detectPowerEvents(data) {
@@ -364,26 +363,26 @@ function detectPowerEvents(data) {
 }
 
 function displayEvents() {
-  const container = document.getElementById('events');
-  container.innerHTML = '';
+  const container = document.getElementById("events");
+  container.innerHTML = "";
   if (detectedEventSet.size === 0) return;
 
-  const divContainer = document.createElement('div');
-  divContainer.className = 'error-event-card';
+  const divContainer = document.createElement("div");
+  divContainer.className = "error-event-card";
   container.appendChild(divContainer);
 
-  const title = document.createElement('strong');
-  title.textContent = '⚠ Detected Power Drop Events:';
+  const title = document.createElement("strong");
+  title.textContent = "⚠ Detected Power Drop Events:";
   divContainer.appendChild(title);
-  container.appendChild(document.createElement('br'));
+  container.appendChild(document.createElement("br"));
 
   //creating another div for list
-  const divList = document.createElement('div');
-  divList.className = 'error-event-list-card';
+  const divList = document.createElement("div");
+  divList.className = "error-event-list-card";
   container.appendChild(divList);
-  const ul = document.createElement('ul');
-  detectedEventSet.forEach(e => {
-    const li = document.createElement('li');
+  const ul = document.createElement("ul");
+  detectedEventSet.forEach((e) => {
+    const li = document.createElement("li");
     li.textContent = e;
     ul.appendChild(li);
   });
@@ -391,8 +390,9 @@ function displayEvents() {
 }
 
 function updateLastUpdatedTime() {
-  document.getElementById('last_updated').innerHTML =
-    `Last updated at: <strong>${new Date().toLocaleTimeString()}</strong>`;
+  document.getElementById(
+    "last_updated"
+  ).innerHTML = `Last updated at: <strong>${new Date().toLocaleTimeString()}</strong>`;
 }
 
 function startPolling(date) {
@@ -406,42 +406,68 @@ function stopPolling() {
 }
 
 function setLiveStatus() {
-  document.getElementById('status').innerHTML =
-    `<span class="live-dot"></span><span>LIVE (auto-updating every 2 minutes)</span>`;
+  document.getElementById(
+    "status"
+  ).innerHTML = `<span class="live-dot"></span><span>LIVE (auto-updating every 2 minutes)</span>`;
 }
 
 function setHistoricalStatus() {
-  document.getElementById('status').innerText = 'Showing historical data';
+  document.getElementById("status").innerText = "Showing historical data";
 }
 
 function clearUI() {
-  document.getElementById('chart_div').innerHTML = '';
-  document.getElementById('events').innerHTML = '';
+  document.getElementById("chart_div").innerHTML = "";
+  document.getElementById("events").innerHTML = "";
 }
 
 function getTodayDate() {
-  return new Date().toISOString().split('T')[0];
+  return new Date().toISOString().split("T")[0];
 }
 
 function formatDate(d) {
-  return d.toISOString().split('T')[0];
+  return d.toISOString().split("T")[0];
 }
 
 function downloadDashboardSection() {
-  const area = document.getElementById('download-area');
+  const area = document.getElementById("download-area");
   if (!area) return;
 
   html2canvas(area, {
     useCORS: true,
-    scale: 2,            // sharp image
+    scale: 2, // sharp image
     backgroundColor: null,
-  }).then(canvas => {
-    const dataURL = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
+  }).then((canvas) => {
+    const dataURL = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
     link.href = dataURL;
     link.download = `solar-dashboard-${getTodayDate()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  });
+}
+
+function updateLatestMetricsTable(data) {
+  const tbody = document.querySelector("#latestMetricsTable tbody");
+  if (!tbody) return;
+
+  tbody.innerHTML = "";
+
+  const lastRowIndex = data.getNumberOfRows() - 1;
+  if (lastRowIndex < 0) return;
+
+  METRIC_COLUMNS.forEach((col) => {
+    const value = data.getValue(lastRowIndex, col.index);
+    const tr = document.createElement("tr");
+
+    const nameTd = document.createElement("td");
+    nameTd.textContent = col.label;
+
+    const valueTd = document.createElement("td");
+    valueTd.textContent = value !== null && value !== undefined ? value : "--";
+
+    tr.appendChild(nameTd);
+    tr.appendChild(valueTd);
+    tbody.appendChild(tr);
   });
 }
