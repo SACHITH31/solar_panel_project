@@ -63,30 +63,53 @@ function loadData(dateValue) {
 
     const data = response.getDataTable();
     lastDataTable = data;
+
     drawChart(data);
     showLiveWatt(data);
     showTotalPower(data);
     updateInverterHealth(data);
+
+    detectedEventSet.clear();      // clear old events for previous date
+
     detectPowerEvents(data);
     updateLastUpdatedTime();
+
   });
 }
 
 // build ticks for 60‑minute intervals on x‑axis
 function buildHourlyTicks(data) {
+  // get first and last time from data
+  let firstTime = data.getValue(0, 0);
+  let lastTime = data.getValue(data.getNumberOfRows() - 1, 0);
+
+  // normalize to Date
+  const toDate = t => {
+    if (t instanceof Date) return new Date(t.getTime());
+    const [h, m] = String(t).split(':').map(Number);
+    const d = new Date();
+    d.setHours(h, m || 0, 0, 0);
+    return d;
+  };
+
+  firstTime = toDate(firstTime);
+  lastTime = toDate(lastTime);
+
+  // extend to next full hour
+  lastTime.setHours(lastTime.getHours() + 1, 0, 0, 0);
+
   const ticks = [];
-  for (let i = 0; i < data.getNumberOfRows(); i++) {
-    const time = data.getValue(i, 0);
-    if (time instanceof Date) {
-      const m = time.getMinutes();
-      if (m === 0) ticks.push(time);
-    } else {
-      const [h, m] = String(time).split(':').map(Number);
-      if (m === 0) ticks.push(time);
-    }
+  const cur = new Date(firstTime.getTime());
+  cur.setMinutes(0, 0, 0);
+
+  while (cur <= lastTime) {
+    ticks.push(new Date(cur.getTime()));
+    cur.setHours(cur.getHours() + 1);
   }
+
   return ticks;
 }
+
 
 function drawChart(data) {
   // add annotation columns if not already present
@@ -114,48 +137,81 @@ function drawChart(data) {
   }
 
   const hourlyTicks = buildHourlyTicks(data);
+  // find last time value (assumes column 0 is Date or "HH:MM")
+let lastTime = data.getValue(data.getNumberOfRows() - 1, 0);
+let viewWindowMax = null;
 
-  const options = {
-    title: 'Solar Power Generation',
-    legend: 'none',
-    curveType: 'function',
-    lineWidth: 3,
+if (lastTime instanceof Date) {
+  viewWindowMax = new Date(lastTime.getTime());
+  viewWindowMax.setHours(viewWindowMax.getHours() + 1);
+} else {
+  // string like "10:00"
+  const [h, m] = String(lastTime).split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m || 0, 0, 0);
+  d.setHours(d.getHours() + 1);
+  viewWindowMax = d;                 // Google Charts can use Date here
+}
 
-    chartArea: {
-      left: 80,
-      top: 40,
-      right: 20,
-      bottom: 60,
-      width: '85%',
-      height: '75%'
-    },
+const options = {
+  title: 'Solar Power Generation',
+  legend: 'none',
+  curveType: 'function',
+  lineWidth: 3,
 
-    hAxis: {
-      title: 'Time',
-      format: 'HH:mm',
-      ticks: hourlyTicks,
-      gridlines: { color: '#e0e0e0', count: -1 },
-      viewWindowMode: 'pretty',
-      textStyle: { fontSize: 11 }
-    },
+  chartArea: {
+    left: 80,
+    top: 50,
+    right: 20,
+    bottom: 70,
+    width: '85%',
+    height: '75%'
+  },
 
-    vAxis: {
-      title: 'Generated Power (Watts)',
-      viewWindow: { min: 0 },
-      gridlines: { color: '#e0e0e0' },
-      minorGridlines: { color: '#f5f5f5' },
-      textStyle: { fontSize: 11 }
-    },
+  // Chart title
+  titleTextStyle: {
+    fontSize: 18,
+    bold: true
+  },
 
-    annotations: {
-      style: 'point',
-      textStyle: {
-        color: 'red',
-        fontSize: 14,
-        bold: true
-      }
+  // X axis (time)
+hAxis: {
+  title: 'Time',
+  format: 'HH:mm',
+  ticks: hourlyTicks,
+  gridlines: { color: '#e0e0e0', count: -1 },
+  viewWindowMode: 'explicit',
+  viewWindow: {
+    min: hourlyTicks[0],
+    max: hourlyTicks[hourlyTicks.length - 1]   // last tick, e.g., 11:00
+  },
+  textStyle: { fontSize: 13 },
+  titleTextStyle: { fontSize: 14, italic: true }
+},
+
+
+
+  // Y axis (power)
+  vAxis: {
+    title: 'Generated Power (Watts)',
+    viewWindow: { min: 0 },
+    gridlines: { color: '#e0e0e0' },
+    minorGridlines: { color: '#f5f5f5' },
+    textStyle: { fontSize: 13 },             // y‑axis labels
+    titleTextStyle: { fontSize: 14, italic: true }
+  },
+
+  // Red warning markers
+  annotations: {
+    style: 'point',
+    textStyle: {
+      color: 'red',
+      fontSize: 16,
+      bold: true
     }
-  };
+  }
+};
+
 
   const chart = new google.visualization.LineChart(
     document.getElementById('chart_div')
@@ -254,27 +310,29 @@ function detectPowerEvents(data) {
 function displayEvents() {
   const container = document.getElementById('events');
   container.innerHTML = '';
+  if (detectedEventSet.size === 0) return;
 
-  if (detectedEventSet.size === 0) {
-    container.innerHTML =
-      '✅ No power drop events detected for this period.';
-    return;
-  }
+  const divContainer = document.createElement('div');
+  divContainer.className = 'error-event-card';
+  container.appendChild(divContainer);
 
   const title = document.createElement('strong');
   title.textContent = '⚠ Detected Power Drop Events:';
-  container.appendChild(title);
+  divContainer.appendChild(title);
   container.appendChild(document.createElement('br'));
 
+  //creating another div for list
+  const divList = document.createElement('div');
+  divList.className = 'error-event-list-card';
+  container.appendChild(divList);
   const ul = document.createElement('ul');
   detectedEventSet.forEach(e => {
     const li = document.createElement('li');
     li.textContent = e;
     ul.appendChild(li);
   });
-  container.appendChild(ul);
+  divList.appendChild(ul);
 }
-
 
 function updateLastUpdatedTime() {
   document.getElementById('last_updated').innerHTML =

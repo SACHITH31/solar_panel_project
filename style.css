@@ -157,9 +157,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   box-shadow: 0 4px 12px rgba(0,0,0,0.04);
   min-height: 40px;       /* keeps a visible bar */
   display: flex;
-  align-items: center;    /* vertically center text */
+  /* align-items: center;    vertically center text */
 }
-
+section#events {
+  flex-direction: column;
+}
 
 /* ===== Summary Cards (Solar details) ===== */
 .detailsCardContainer {
@@ -240,4 +242,28 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .detailsCardContainer > div {
     flex: 1 1 100%; /* 1 per row on small screens */
   }
+}
+
+.error-event-list-card ul {
+  padding-left: 20px;
+  margin-top: 0px;
+}
+
+.okButton {
+  font-size: 16px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border-width: initial;
+    border-style: none;
+    border-color: initial;
+    border-image: initial;
+    background: linear-gradient(90deg, rgb(0, 198, 255), rgb(0, 114, 255));
+    transition: 0.3s;
+}
+.okButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0px 6px 12px rgba(0, 114, 255, 0.3);
 }
