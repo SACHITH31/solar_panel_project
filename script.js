@@ -11,13 +11,13 @@ let lastDataTable = null;
 const detectedEventSet = new Set();
 
 const METRIC_COLUMNS = [
-  { label: "PF Avg (inst) [F]", index: 2 },
-  { label: "VA Total [J]", index: 3 },
-  { label: "VL N Average (A) [N]", index: 4 },
-  { label: "Current Total [V]", index: 5 },
-  { label: "Frequency [Z]", index: 6 },
-  { label: "Wh [AA]", index: 7 },
-  { label: "VAh [AB]", index: 8 },
+  { label: "PF Avg (inst)", index: 2 },
+  { label: "VA Total", index: 3 },
+  { label: "VL N Average", index: 4 },
+  { label: "Current Total", index: 5 },
+  { label: "Frequency", index: 6 },
+  { label: "Wh", index: 7 },
+  { label: "VAh", index: 8 },
 ];
 
 google.charts.setOnLoadCallback(init);
