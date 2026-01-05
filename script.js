@@ -76,6 +76,7 @@ function init() {
   });
 }
 
+
 /* ---------- DATE HANDLING ---------- */
 
 function onDateSelect() {
@@ -314,6 +315,9 @@ function updateLastUpdatedTime() {
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
+function formatDate(d) {
+  return d.toISOString().split("T")[0];
+}
 
 function isDateInRange(dateStr) {
   const d = new Date(dateStr);
@@ -333,138 +337,151 @@ function downloadDashboardSection() {
     link.click();
   });
 }
+/* ===========================
+   MONTHLY BAR GRAPH (CLEAN)
+=========================== */
 
-/* ---------- METRICS ---------- */
+document.getElementById("downloadBtn").addEventListener("click", openMonthlyPopup);
 
-function getLastNonNullInColumn(data, col) {
-  for (let i = data.getNumberOfRows() - 1; i >= 0; i--) {
-    const v = data.getValue(i, col);
-    if (v !== null && v !== "") return v;
-  }
-  return "--";
-}
+function openMonthlyPopup() {
+  let popup = document.getElementById("monthlyPopup");
+  if (popup) return;
 
-function updateLatestMetricsTable(data) {
-  const tbody = document.querySelector("#latestMetricsTable tbody");
-  tbody.innerHTML = "";
+  popup = document.createElement("div");
+  popup.id = "monthlyPopup";
+  popup.style.marginTop = "20px";
 
-  METRIC_COLUMNS.forEach(c => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${c.label}</td><td>${getLastNonNullInColumn(data, c.index)}</td>`;
-    tbody.appendChild(tr);
-  });
-}
+  popup.innerHTML = `
+    <div class="controls-card">
+      <label>Month</label>
+      <select id="monthSelect">
+        ${[...Array(12)].map((_, i) =>
+          `<option value="${i + 1}">
+            ${new Date(0, i).toLocaleString("default", { month: "long" })}
+          </option>`
+        ).join("")}
+      </select>
 
-// Show Month Popup on Download button click
-document.getElementById("downloadBtn").addEventListener("click", () => {
+      <label>Year</label>
+      <select id="yearSelect"></select>
+
+      <button onclick="generateMonthlyBarChart()">Generate</button>
+      <button onclick="closeMonthlyPopup()">Close</button>
+    </div>
+
+    <div id="monthlyDateRange" style="margin:15px 0;font-weight:600;"></div>
+    <div id="monthlyLoader"></div>
+    <div id="monthlyBarChart" style="height:420px;"></div>
+  `;
+
+  document.querySelector(".controls-card").after(popup);
+
   populateYearSelect();
-  document.getElementById("monthPopup").style.display = "flex";
-});
+}
 
-// Close Popup
-document.getElementById("closeMonthPopup").addEventListener("click", () => {
-  document.getElementById("monthPopup").style.display = "none";
-  document.getElementById("monthlyBarChartContainer").style.display = "none";
-});
+function closeMonthlyPopup() {
+  const popup = document.getElementById("monthlyPopup");
+  if (popup) popup.remove();
+}
 
-// Populate Year Dropdown based on data range
 function populateYearSelect() {
   const yearSelect = document.getElementById("yearSelect");
-  yearSelect.innerHTML = "";
-  const startYear = 2025; // your sheet starts from 2025
+  const startYear = 2025;
   const endYear = new Date().getFullYear();
+
+  yearSelect.innerHTML = "";
   for (let y = startYear; y <= endYear; y++) {
-    const option = document.createElement("option");
-    option.value = y;
-    option.textContent = y;
-    yearSelect.appendChild(option);
+    yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
   }
 }
 
-// Generate Month Chart
-document.getElementById("generateMonthChart").addEventListener("click", async () => {
-  const month = parseInt(document.getElementById("monthSelect").value);
-  const year = parseInt(document.getElementById("yearSelect").value);
+function showMonthlyLoader() {
+  document.getElementById("monthlyLoader").innerHTML =
+    `<div style="text-align:center;padding:20px;">Loading...</div>`;
+}
 
-  const monthlyData = await fetchMonthlyData(month, year);
+function hideMonthlyLoader() {
+  document.getElementById("monthlyLoader").innerHTML = "";
+}
 
-  if (!monthlyData || monthlyData.length === 0) {
-    alert(`No data found for ${month}/${year}`);
-    document.getElementById("monthlyBarChartContainer").style.display = "none";
-    return;
-  }
+function generateMonthlyBarChart() {
+  const month = Number(document.getElementById("monthSelect").value);
+  const year = Number(document.getElementById("yearSelect").value);
 
-  drawMonthlyBarChart(monthlyData, month, year);
-});
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0);
 
-// Fetch Monthly Data from Google Sheets
-async function fetchMonthlyData(month, year) {
-  const dates = {}; // { "YYYY-MM-DD": maxWatts }
-  const baseUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${SHEET_PREFIX}`;
-  const dataArray = [];
+  document.getElementById("monthlyDateRange").innerText =
+    `From ${formatDisplayDate(startDate)} To ${formatDisplayDate(endDate)}`;
 
-  // Assuming sheets are named per date YYYY-MM-DD
-  const daysInMonth = new Date(year, month, 0).getDate();
+  showMonthlyLoader();
 
-  for (let d = 1; d <= daysInMonth; d++) {
-    const day = String(d).padStart(2, "0");
-    const dateStr = `${year}-${String(month).padStart(2,"0")}-${day}`;
+  const promises = [];
+  const dailyData = [];
+
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    const dateStr = formatDate(d);
     const sheetName = SHEET_PREFIX + dateStr;
 
-    try {
-      const query = new google.visualization.Query(
-        `${baseUrl}${encodeURIComponent(sheetName)}`
-      );
-      query.setQuery("SELECT A,B WHERE A IS NOT NULL AND B IS NOT NULL");
+    promises.push(
+      new Promise(resolve => {
+        const query = new google.visualization.Query(
+          `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`
+        );
 
-      const response = await new Promise((resolve, reject) => {
-        query.send((res) => {
-          if (res.isError()) reject(res);
-          else resolve(res);
+        query.setQuery("SELECT B WHERE B IS NOT NULL");
+        query.send(res => {
+          if (res.isError()) return resolve(null);
+
+          const dt = res.getDataTable();
+          if (!dt || dt.getNumberOfRows() === 0) return resolve(null);
+
+          let max = 0;
+          for (let i = 0; i < dt.getNumberOfRows(); i++) {
+            max = Math.max(max, dt.getValue(i, 0));
+          }
+
+          resolve({ day: d.getDate(), value: max });
         });
-      });
-
-      const data = response.getDataTable();
-      if (!data || data.getNumberOfRows() === 0) continue;
-
-      let maxWatts = 0;
-      for (let i = 0; i < data.getNumberOfRows(); i++) {
-        const watt = data.getValue(i, 1);
-        if (watt > maxWatts) maxWatts = watt;
-      }
-
-      dataArray.push({ day: d, maxWatts });
-    } catch (err) {
-      // ignore missing sheets
-      continue;
-    }
+      })
+    );
   }
 
-  return dataArray;
+  Promise.all(promises).then(results => {
+    hideMonthlyLoader();
+
+    results.forEach(r => r && dailyData.push(r));
+
+    if (!dailyData.length) {
+      alert("No data found for selected month");
+      document.getElementById("monthlyBarChart").innerHTML = "";
+      return;
+    }
+
+    drawMonthlyBarChart(dailyData, month, year);
+  });
 }
 
-// Draw Monthly Bar Chart
-function drawMonthlyBarChart(dataArray, month, year) {
-  const container = document.getElementById("monthlyBarChartContainer");
-  container.style.display = "block";
+function drawMonthlyBarChart(data, month, year) {
+  const dt = new google.visualization.DataTable();
+  dt.addColumn("string", "Day");
+  dt.addColumn("number", "Max Watts");
 
-  const dataTable = new google.visualization.DataTable();
-  dataTable.addColumn("string", "Day");
-  dataTable.addColumn("number", "Max Watts Total");
+  data.forEach(d => dt.addRow([String(d.day), d.value]));
 
-  dataArray.forEach(d => {
-    dataTable.addRow([String(d.day), d.maxWatts]);
-  });
+  const chart = new google.visualization.ColumnChart(
+    document.getElementById("monthlyBarChart")
+  );
 
-  const options = {
-    title: `Max Daily Watts Total - ${month}/${year}`,
-    legend: { position: "none" },
+  chart.draw(dt, {
+    title: `Max Daily Watts - ${month}/${year}`,
+    legend: "none",
     vAxis: { minValue: 0 },
-    height: 400,
-    bar: { groupWidth: "60%" },
+    bar: { groupWidth: "70%" },
     colors: ["#0072ff"],
-  };
+  });
+}
 
-  const chart = new google.visualization.ColumnChart(document.getElementById("monthlyBarChart"));
-  chart.draw(dataTable, options);
+function formatDisplayDate(d) {
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
