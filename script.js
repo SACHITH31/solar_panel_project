@@ -354,3 +354,117 @@ function updateLatestMetricsTable(data) {
     tbody.appendChild(tr);
   });
 }
+
+// Show Month Popup on Download button click
+document.getElementById("downloadBtn").addEventListener("click", () => {
+  populateYearSelect();
+  document.getElementById("monthPopup").style.display = "flex";
+});
+
+// Close Popup
+document.getElementById("closeMonthPopup").addEventListener("click", () => {
+  document.getElementById("monthPopup").style.display = "none";
+  document.getElementById("monthlyBarChartContainer").style.display = "none";
+});
+
+// Populate Year Dropdown based on data range
+function populateYearSelect() {
+  const yearSelect = document.getElementById("yearSelect");
+  yearSelect.innerHTML = "";
+  const startYear = 2025; // your sheet starts from 2025
+  const endYear = new Date().getFullYear();
+  for (let y = startYear; y <= endYear; y++) {
+    const option = document.createElement("option");
+    option.value = y;
+    option.textContent = y;
+    yearSelect.appendChild(option);
+  }
+}
+
+// Generate Month Chart
+document.getElementById("generateMonthChart").addEventListener("click", async () => {
+  const month = parseInt(document.getElementById("monthSelect").value);
+  const year = parseInt(document.getElementById("yearSelect").value);
+
+  const monthlyData = await fetchMonthlyData(month, year);
+
+  if (!monthlyData || monthlyData.length === 0) {
+    alert(`No data found for ${month}/${year}`);
+    document.getElementById("monthlyBarChartContainer").style.display = "none";
+    return;
+  }
+
+  drawMonthlyBarChart(monthlyData, month, year);
+});
+
+// Fetch Monthly Data from Google Sheets
+async function fetchMonthlyData(month, year) {
+  const dates = {}; // { "YYYY-MM-DD": maxWatts }
+  const baseUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${SHEET_PREFIX}`;
+  const dataArray = [];
+
+  // Assuming sheets are named per date YYYY-MM-DD
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const day = String(d).padStart(2, "0");
+    const dateStr = `${year}-${String(month).padStart(2,"0")}-${day}`;
+    const sheetName = SHEET_PREFIX + dateStr;
+
+    try {
+      const query = new google.visualization.Query(
+        `${baseUrl}${encodeURIComponent(sheetName)}`
+      );
+      query.setQuery("SELECT A,B WHERE A IS NOT NULL AND B IS NOT NULL");
+
+      const response = await new Promise((resolve, reject) => {
+        query.send((res) => {
+          if (res.isError()) reject(res);
+          else resolve(res);
+        });
+      });
+
+      const data = response.getDataTable();
+      if (!data || data.getNumberOfRows() === 0) continue;
+
+      let maxWatts = 0;
+      for (let i = 0; i < data.getNumberOfRows(); i++) {
+        const watt = data.getValue(i, 1);
+        if (watt > maxWatts) maxWatts = watt;
+      }
+
+      dataArray.push({ day: d, maxWatts });
+    } catch (err) {
+      // ignore missing sheets
+      continue;
+    }
+  }
+
+  return dataArray;
+}
+
+// Draw Monthly Bar Chart
+function drawMonthlyBarChart(dataArray, month, year) {
+  const container = document.getElementById("monthlyBarChartContainer");
+  container.style.display = "block";
+
+  const dataTable = new google.visualization.DataTable();
+  dataTable.addColumn("string", "Day");
+  dataTable.addColumn("number", "Max Watts Total");
+
+  dataArray.forEach(d => {
+    dataTable.addRow([String(d.day), d.maxWatts]);
+  });
+
+  const options = {
+    title: `Max Daily Watts Total - ${month}/${year}`,
+    legend: { position: "none" },
+    vAxis: { minValue: 0 },
+    height: 400,
+    bar: { groupWidth: "60%" },
+    colors: ["#0072ff"],
+  };
+
+  const chart = new google.visualization.ColumnChart(document.getElementById("monthlyBarChart"));
+  chart.draw(dataTable, options);
+}

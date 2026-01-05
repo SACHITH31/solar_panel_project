@@ -494,3 +494,41 @@ div#custom_legend {
     transform: rotate(360deg);
   }
 }
+
+.month-popup {
+  margin-top: 20px;
+  padding: 15px 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.month-popup label {
+  font-weight: 600;
+}
+
+.month-popup select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+.month-popup button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  color: #fff;
+  font-weight: 600;
+}
+
+#monthlyBarChart {
+  width: 100%;
+  height: 400px;
+}
