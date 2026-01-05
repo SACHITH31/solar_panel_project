@@ -469,3 +469,27 @@ div#custom_legend {
 .metrics-table tr:last-child td {
   border-bottom: none;
 }
+
+#loader {
+  display: flex;
+  justify-content: center;
+  align-items:center;
+  height: 200px;
+  width: 200px;
+  padding: 5px;
+  border-radius: 50%;
+  border: 10px solid #ddd;
+  border-top-color: #0072ff;
+  animation: rotate 1s infinite;
+}
+
+@keyframes rotate {
+  100% {
+    rotate: 360deg;
+  }
+}
+
+rect {
+  color: red;
+  background-color: red;
+}

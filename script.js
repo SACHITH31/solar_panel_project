@@ -6,15 +6,10 @@ const POLLING_INTERVAL = 120000;
 
 let pollingTimer = null;
 let isLive = false;
-
-// prevent duplicate events forever
-const detectedEventSet = new Set();
-
-// latest DataTable for responsive redraw
 let lastDataTable = null;
 
-// Columns used for "Latest Inverter Metrics" table
-// (index values are positions in the DataTable from the SELECT above)
+const detectedEventSet = new Set();
+
 const METRIC_COLUMNS = [
   { label: "PF Avg (inst) [F]", index: 2 },
   { label: "VA Total [J]", index: 3 },
@@ -27,47 +22,78 @@ const METRIC_COLUMNS = [
 
 google.charts.setOnLoadCallback(init);
 
+/* ---------- UI HELPERS (NON-LOGIC) ---------- */
+
+function showLoading() {
+  let loader = document.getElementById("loader");
+  if (!loader) {
+    loader = document.createElement("div");
+    loader.id = "loader";
+    loader.innerText = "";
+    document.querySelector(".chart-card").prepend(loader);
+  }
+}
+
+function hideLoading() {
+  const loader = document.getElementById("loader");
+  if (loader) loader.remove();
+}
+
+function showError(msg) {
+  let banner = document.getElementById("error-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "error-banner";
+    banner.style.cssText =
+      "background:#ffe5e5;color:#b00020;padding:12px;border-radius:8px;font-weight:600;margin-bottom:10px";
+    document.querySelector(".dashboard-container").prepend(banner);
+  }
+  banner.innerText = msg;
+}
+
+function clearError() {
+  const banner = document.getElementById("error-banner");
+  if (banner) banner.remove();
+}
+
+/* ---------- INIT ---------- */
+
 function init() {
   const today = getTodayDate();
   document.getElementById("datePicker").value = today;
 
-  // set disabled today display
-  document.getElementById("todayDisplay").value = today;
-  document.getElementById("todayDisplay").title = `Today is ${today}`;
+  const todayDisplay = document.getElementById("todayDisplay");
+  if (todayDisplay) {
+    todayDisplay.value = today;
+    todayDisplay.title = `Today is ${today}`;
+  }
 
   loadData(today);
   startPolling(today);
-  updateDateNavButtons(today);
 
   window.addEventListener("resize", () => {
-    if (!lastDataTable) return;
-    drawChart(lastDataTable);
+    if (lastDataTable) drawChart(lastDataTable);
   });
 }
 
+/* ---------- DATE HANDLING ---------- */
+
 function onDateSelect() {
-  const dateInput = document.getElementById("datePicker");
-  const selectedDate = dateInput.value;
-  if (!selectedDate) {
-    alert("Please select a date");
-    return;
-  }
+  const selectedDate = document.getElementById("datePicker").value;
+  if (!selectedDate) return;
 
-  // if date is outside valid range, show message and load TODAY instead
-  if (!isDateInRange(selectedDate)) {
-    alert(`No data available for ${selectedDate}. Showing today's data.`);
-    const today = getTodayDate();
-    dateInput.value = today;
-
-    stopPolling();
-    loadData(today);
-    startPolling(today);          // today is LIVE
-    updateDateNavButtons(today);
-    return;
-  }
-
-  // normal valid date flow
   stopPolling();
+
+  if (!isDateInRange(selectedDate)) {
+    showError(`No data available for ${selectedDate}. Showing today's data.`);
+    const today = getTodayDate();
+    document.getElementById("datePicker").value = today;
+    loadData(today);
+    startPolling(today);
+    return;
+  }
+
+  clearError();
   loadData(selectedDate);
 
   if (selectedDate === getTodayDate()) {
@@ -75,73 +101,17 @@ function onDateSelect() {
   } else {
     setHistoricalStatus();
   }
-  updateDateNavButtons(selectedDate);
 }
 
-
-function changeDateBy(days) {
-  const dateInput = document.getElementById("datePicker");
-  const current = dateInput.value || getTodayDate();
-
-  const d = new Date(current);
-  d.setDate(d.getDate() + days);
-
-  const newDate = formatDate(d);
-  dateInput.value = newDate;
-
-  // if out of range, just show message and do NOT load data
-  if (!isDateInRange(newDate)) {
-    clearUI();
-    alert(`No data available for ${newDate}`);
-    setHistoricalStatus();
-    updateDateNavButtons(newDate);
-    return;
-  }
-
-  // behave like manual selection
-  stopPolling();
-  loadData(newDate);
-
-  if (newDate === getTodayDate()) {
-    startPolling(newDate);
-  } else {
-    setHistoricalStatus();
-  }
-
-  updateDateNavButtons(newDate);
-}
-
-function goToPreviousDate() {
-  changeDateBy(-1);
-}
-
-function goToNextDate() {
-  changeDateBy(1);
-}
-
-// enable/disable prev/next according to today
-function updateDateNavButtons(selectedDate) {
-  const today = getTodayDate();
-  const prevBtn = document.getElementById("prevDateBtn");
-  const nextBtn = document.getElementById("nextDateBtn");
-
-  // next disabled if selected date is today or in future
-  const sel = new Date(selectedDate);
-  const todayDate = new Date(today);
-
-  nextBtn.disabled = sel >= todayDate;
-
-  // previous always enabled unless you want a lower bound
-  prevBtn.disabled = false;
-}
+/* ---------- DATA LOADING ---------- */
 
 function loadData(dateValue) {
-  const sheetName = SHEET_PREFIX + dateValue;
+  clearError();
+  showLoading();
 
+  const sheetName = SHEET_PREFIX + dateValue;
   const query = new google.visualization.Query(
-    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
-      sheetName
-    )}`
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`
   );
 
   query.setQuery(
@@ -149,16 +119,18 @@ function loadData(dateValue) {
   );
 
   query.send((response) => {
+    hideLoading();
+
     if (response.isError()) {
       clearUI();
-      alert(`No data available for ${dateValue}`);
+      showError(`No data available for ${dateValue}`);
       return;
     }
 
     const data = response.getDataTable();
     if (!data || data.getNumberOfRows() === 0) {
       clearUI();
-      alert(`No data available for ${dateValue}`);
+      showError(`No data available for ${dateValue}`);
       return;
     }
 
@@ -176,157 +148,56 @@ function loadData(dateValue) {
   });
 }
 
-
-// build ticks for 60‑minute intervals on x‑axis
-function buildHourlyTicks(data) {
-  // get first and last time from data
-  let firstTime = data.getValue(0, 0);
-  let lastTime = data.getValue(data.getNumberOfRows() - 1, 0);
-
-  // normalize to Date
-  const toDate = (t) => {
-    if (t instanceof Date) return new Date(t.getTime());
-    const [h, m] = String(t).split(":").map(Number);
-    const d = new Date();
-    d.setHours(h, m || 0, 0, 0);
-    return d;
-  };
-
-  firstTime = toDate(firstTime);
-  lastTime = toDate(lastTime);
-
-  // extend to next full hour
-  lastTime.setHours(lastTime.getHours() + 1, 0, 0, 0);
-
-  const ticks = [];
-  const cur = new Date(firstTime.getTime());
-  cur.setMinutes(0, 0, 0);
-
-  while (cur <= lastTime) {
-    ticks.push(new Date(cur.getTime()));
-    cur.setHours(cur.getHours() + 1);
-  }
-
-  return ticks;
-}
+/* ---------- CHART ---------- */
 
 function drawChart(data) {
-  // ensure annotation columns at end
-  let currentCols = data.getNumberOfColumns();
-  let annotationColIndex, annotationTextColIndex;
-
-  if (currentCols === 9) {
-    annotationColIndex = currentCols;
-    annotationTextColIndex = currentCols + 1;
+  let cols = data.getNumberOfColumns();
+  if (cols === 9) {
     data.addColumn({ type: "string", role: "annotation" });
     data.addColumn({ type: "string", role: "annotationText" });
-    currentCols = data.getNumberOfColumns();
-  } else {
-    annotationColIndex = currentCols - 2;
-    annotationTextColIndex = currentCols - 1;
   }
 
-  const DROP_THRESHOLD = 15000;
+  const annotationCol = data.getNumberOfColumns() - 2;
+  const annotationTextCol = data.getNumberOfColumns() - 1;
+
   let lastPower = null;
+  const DROP_THRESHOLD = 15000;
 
   for (let i = 0; i < data.getNumberOfRows(); i++) {
-    const power = data.getValue(i, 1); // Watts Total
-    let marker = null;
-    let text = null;
-
-    if (lastPower !== null && lastPower - power > DROP_THRESHOLD) {
-      marker = "⚠";
-      text = "Sudden Power Drop";
+    const power = data.getValue(i, 1);
+    if (lastPower && lastPower - power > DROP_THRESHOLD) {
+      data.setValue(i, annotationCol, "⚠");
+      data.setValue(i, annotationTextCol, "Sudden Power Drop");
     }
-
-    data.setValue(i, annotationColIndex, marker);
-    data.setValue(i, annotationTextColIndex, text);
     lastPower = power;
   }
 
-  const hourlyTicks = buildHourlyTicks(data);
-
-  const options = {
-    title: "SOLAR POWER GENERATION (Watts)",
-    legend: "none",
-    curveType: "function",
-    lineWidth: 3,
-    chartArea: {
-      left: 80,
-      top: 50,
-      right: 20,
-      bottom: 70,
-      width: "85%",
-      height: "75%",
-    },
-    titleTextStyle: {
-      fontSize: 18,
-      bold: true,
-    },
-    hAxis: {
-      title: "Time",
-      format: "HH:mm",
-      ticks: hourlyTicks,
-      gridlines: { color: "#e0e0e0", count: -1 },
-      viewWindowMode: "explicit",
-      viewWindow: {
-        min: hourlyTicks[0],
-        max: hourlyTicks[hourlyTicks.length - 1],
-      },
-      textStyle: { fontSize: 13 },
-      titleTextStyle: { fontSize: 14, italic: true },
-    },
-    vAxis: {
-      title: "Generated Power (Watts)",
-      viewWindow: { min: 0 },
-      gridlines: { color: "#e0e0e0" },
-      minorGridlines: { color: "#f5f5f5" },
-      textStyle: { fontSize: 13 },
-      titleTextStyle: { fontSize: 14, italic: true },
-    },
-    annotations: {
-      style: "point",
-      textStyle: {
-        color: "red",
-        fontSize: 16,
-        bold: true,
-      },
-    },
-  };
-
-  // Only show Timestamp, Watts Total, annotation, annotationText in the chart
   const view = new google.visualization.DataView(data);
-  view.setColumns([0, 1, annotationColIndex, annotationTextColIndex]);
+  view.setColumns([0, 1, annotationCol, annotationTextCol]);
 
   const chart = new google.visualization.LineChart(
     document.getElementById("chart_div")
   );
-  chart.draw(view, options);
+
+  chart.draw(view, {
+    title: "SOLAR POWER GENERATION (Watts)",
+    legend: "none",
+    curveType: "function",
+    lineWidth: 3,
+    chartArea: { left: 80, top: 50, width: "85%", height: "75%" },
+    hAxis: { title: "Time", format: "HH:mm" },
+    vAxis: { title: "Generated Power (Watts)", viewWindow: { min: 0 } },
+    annotations: { style: "point" },
+  });
 }
+
+/* ---------- SUMMARY ---------- */
 
 function showLiveWatt(data) {
-  const lastRow = data.getNumberOfRows() - 1;
-  const watt = data.getValue(lastRow, 1);
-  const kwh = (watt / 1000).toFixed(2);
-
-  const el = document.getElementById("live_watt");
-  el.innerHTML = `⚡ Live Watt : <strong>${kwh} kWh</strong>`;
-  el.title = `Live Watt is: ${kwh} kWh`;
-  el.style.opacity = 1;
-  el.style.transition = "opacity 1s ease-in";
-  el.style.cursor = "pointer";
-}
-
-function showCO2Saved(totalKwh) {
-  const CO2_FACTOR = 0.82; // kg per kWh
-  const co2 = totalKwh * CO2_FACTOR;
-
-  const el = document.getElementById("co2_saved");
-  el.innerHTML = `🌱 CO₂ Saved : <strong>${co2.toFixed(0)} kg</strong>`;
-  el.title = `CO₂ Saved is: ${co2.toFixed(0)} kg`;
-  el.style.opacity = 1;
-  el.style.transition = "opacity 1s ease-in";
-  el.style.cursor = "pointer";
+  const last = data.getNumberOfRows() - 1;
+  const watt = (data.getValue(last, 1) / 1000).toFixed(2);
+  document.getElementById("live_watt").innerHTML =
+    `⚡ Live Watt : <strong>${watt} kWh</strong>`;
 }
 
 function showTotalPower(data) {
@@ -336,196 +207,139 @@ function showTotalPower(data) {
   }
 
   const totalKwh = total / 1000;
-
-  const el = document.getElementById("total_power");
-  el.innerHTML = `☀️ Solar Energy Today : <strong>${totalKwh.toFixed(
-    2
-  )} kWh</strong>`;
-  el.title = `Solar Energy Today : ${totalKwh.toFixed(2)} kWh`;
-  el.style.opacity = 1;
-  el.style.transition = "opacity 1s ease-in";
-  el.style.cursor = "pointer";
+  document.getElementById("total_power").innerHTML =
+    `☀️ Solar Energy Today : <strong>${totalKwh.toFixed(2)} kWh</strong>`;
 
   showCO2Saved(totalKwh);
 }
 
-function updateInverterHealth(data) {
-  let lastPower = null;
-  let maxDropPercent = 0;
-
-  for (let i = 0; i < data.getNumberOfRows(); i++) {
-    const power = data.getValue(i, 1);
-    if (lastPower && power < lastPower) {
-      const dropPercent = ((lastPower - power) / lastPower) * 100;
-      maxDropPercent = Math.max(maxDropPercent, dropPercent);
-    }
-    lastPower = power;
-  }
-
-  const health = maxDropPercent === 0 ? 100 : (100 - maxDropPercent).toFixed(1);
-
-  const el = document.getElementById("inverter-health");
-  el.innerHTML = `🟢 Inverter Health : <strong>${health}%</strong>`;
-  el.title = `Inverter Health is: ${health}%`;
-  el.style.opacity = 1;
-  el.style.transition = "opacity 1s ease-in";
-  el.style.cursor = "pointer";
+function showCO2Saved(totalKwh) {
+  const co2 = totalKwh * 0.82;
+  document.getElementById("co2_saved").innerHTML =
+    `🌱 CO₂ Saved : <strong>${co2.toFixed(0)} kg</strong>`;
 }
 
+function updateInverterHealth(data) {
+  let last = null, maxDrop = 0;
+  for (let i = 0; i < data.getNumberOfRows(); i++) {
+    const p = data.getValue(i, 1);
+    if (last && p < last) {
+      maxDrop = Math.max(maxDrop, ((last - p) / last) * 100);
+    }
+    last = p;
+  }
+  document.getElementById("inverter-health").innerHTML =
+    `🟢 Inverter Health : <strong>${(100 - maxDrop).toFixed(1)}%</strong>`;
+}
+
+/* ---------- EVENTS ---------- */
+
 function detectPowerEvents(data) {
+  let last = null;
   const DROP_THRESHOLD = 15000;
-  let lastPower = null;
 
   for (let i = 0; i < data.getNumberOfRows(); i++) {
-    const time = data.getValue(i, 0);
-    const power = data.getValue(i, 1);
-
-    if (lastPower && lastPower - power > DROP_THRESHOLD) {
-      const dropPercent = (((lastPower - power) / lastPower) * 100).toFixed(1);
-      const eventKey = `${time} - Drop ${dropPercent}%`;
-
-      if (!detectedEventSet.has(eventKey)) {
-        detectedEventSet.add(eventKey);
-      }
+    const p = data.getValue(i, 1);
+    const t = data.getValue(i, 0);
+    if (last && last - p > DROP_THRESHOLD) {
+      detectedEventSet.add(`${t} - Sudden Drop`);
     }
-    lastPower = power;
+    last = p;
   }
-
   displayEvents();
 }
 
 function displayEvents() {
-  const container = document.getElementById("events");
-  container.innerHTML = "";
-  if (detectedEventSet.size === 0) return;
+  const el = document.getElementById("events");
+  el.innerHTML = "";
+  if (!detectedEventSet.size) return;
 
-  const divContainer = document.createElement("div");
-  divContainer.className = "error-event-card";
-  container.appendChild(divContainer);
-
-  const title = document.createElement("strong");
-  title.textContent = "⚠ Detected Power Drop Events:";
-  divContainer.appendChild(title);
-  container.appendChild(document.createElement("br"));
-
-  //creating another div for list
-  const divList = document.createElement("div");
-  divList.className = "error-event-list-card";
-  container.appendChild(divList);
   const ul = document.createElement("ul");
-  detectedEventSet.forEach((e) => {
+  detectedEventSet.forEach(e => {
     const li = document.createElement("li");
     li.textContent = e;
     ul.appendChild(li);
   });
-  divList.appendChild(ul);
+  el.appendChild(ul);
 }
 
-function updateLastUpdatedTime() {
-  document.getElementById(
-    "last_updated"
-  ).innerHTML = `Last updated at: <strong>${new Date().toLocaleTimeString()}</strong>`;
-}
+/* ---------- LIVE ---------- */
 
 function startPolling(date) {
-  isLive = true;
+  stopPolling();
   setLiveStatus();
   pollingTimer = setInterval(() => loadData(date), POLLING_INTERVAL);
 }
 
 function stopPolling() {
-  clearInterval(pollingTimer);
+  if (pollingTimer) {
+    clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
 }
 
 function setLiveStatus() {
-  document.getElementById(
-    "status"
-  ).innerHTML = `<span class="live-dot"></span><span>LIVE (auto-updating every 2 minutes)</span>`;
+  document.getElementById("status").innerHTML =
+    `<span class="live-dot"></span><span>LIVE (auto-updating every 2 minutes)</span>`;
 }
 
 function setHistoricalStatus() {
-  document.getElementById("status").innerText = "Showing historical data";
+  document.getElementById("status").innerHTML =
+    `<span>📅 Historical Data</span>`;
 }
+
+/* ---------- UTIL ---------- */
 
 function clearUI() {
   document.getElementById("chart_div").innerHTML = "";
   document.getElementById("events").innerHTML = "";
 }
 
+function updateLastUpdatedTime() {
+  document.getElementById("last_updated").innerHTML =
+    `Last updated at: <strong>${new Date().toLocaleTimeString()}</strong>`;
+}
+
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
 
-function formatDate(d) {
-  return d.toISOString().split("T")[0];
-}
-
 function isDateInRange(dateStr) {
   const d = new Date(dateStr);
-  if (isNaN(d)) return false;
-
-  const min = new Date('2025-11-22');      // first date with data
-  const max = new Date(getTodayDate());    // today
-
-  min.setHours(0, 0, 0, 0);
-  max.setHours(0, 0, 0, 0);
-  d.setHours(0, 0, 0, 0);
-
+  const min = new Date("2025-11-22");
+  const max = new Date(getTodayDate());
   return d >= min && d <= max;
 }
 
-
+/* ---------- DOWNLOAD ---------- */
 
 function downloadDashboardSection() {
   const area = document.getElementById("download-area");
-  if (!area) return;
-
-  html2canvas(area, {
-    useCORS: true,
-    scale: 2, // sharp image
-    backgroundColor: null,
-  }).then((canvas) => {
-    const dataURL = canvas.toDataURL("image/png");
+  html2canvas(area, { scale: 2 }).then(canvas => {
     const link = document.createElement("a");
-    link.href = dataURL;
-    link.download = `solar-dashboard-${getTodayDate()}.png`;
-    document.body.appendChild(link);
+    link.href = canvas.toDataURL("image/png");
+    link.download = `solar-dashboard-${document.getElementById("datePicker").value}.png`;
     link.click();
-    document.body.removeChild(link);
   });
 }
 
-function getLastNonNullInColumn(data, colIndex) {
-  for (let row = data.getNumberOfRows() - 1; row >= 0; row--) {
-    const v = data.getValue(row, colIndex);
-    if (v !== null && v !== undefined && v !== '') {
-      return v;
-    }
+/* ---------- METRICS ---------- */
+
+function getLastNonNullInColumn(data, col) {
+  for (let i = data.getNumberOfRows() - 1; i >= 0; i--) {
+    const v = data.getValue(i, col);
+    if (v !== null && v !== "") return v;
   }
-  return null;
+  return "--";
 }
 
 function updateLatestMetricsTable(data) {
-  const tbody = document.querySelector('#latestMetricsTable tbody');
-  if (!tbody) return;
+  const tbody = document.querySelector("#latestMetricsTable tbody");
+  tbody.innerHTML = "";
 
-  tbody.innerHTML = '';
-
-  METRIC_COLUMNS.forEach(col => {
-    const value = getLastNonNullInColumn(data, col.index);
-
-    const tr = document.createElement('tr');
-
-    const nameTd = document.createElement('td');
-    nameTd.textContent = col.label;
-
-    const valueTd = document.createElement('td');
-    valueTd.textContent =
-      value !== null && value !== undefined && value !== '' ? value : '--';
-
-    tr.appendChild(nameTd);
-    tr.appendChild(valueTd);
+  METRIC_COLUMNS.forEach(c => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${c.label}</td><td>${getLastNonNullInColumn(data, c.index)}</td>`;
     tbody.appendChild(tr);
   });
 }
-
