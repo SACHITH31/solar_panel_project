@@ -470,26 +470,27 @@ div#custom_legend {
   border-bottom: none;
 }
 
+/* ===== Beautiful Circular Loader ===== */
 #loader {
   display: flex;
   justify-content: center;
-  align-items:center;
-  height: 200px;
-  width: 200px;
-  padding: 5px;
+  align-items: center;
+  width: 80px;
+  height: 80px;
+  margin: 40px auto;
   border-radius: 50%;
-  border: 10px solid #ddd;
-  border-top-color: #0072ff;
-  animation: rotate 1s infinite;
+  border: 8px solid rgba(0, 114, 255, 0.15);
+  border-top: 8px solid #0072ff;
+  animation: spin 1s linear infinite;
+  box-shadow: 0 0 18px rgba(0, 114, 255, 0.4);
 }
 
-@keyframes rotate {
-  100% {
-    rotate: 360deg;
+/* smooth professional spin */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
   }
-}
-
-rect {
-  color: red;
-  background-color: red;
+  100% {
+    transform: rotate(360deg);
+  }
 }

@@ -187,9 +187,20 @@ function drawChart(data) {
     chartArea: { left: 80, top: 50, width: "85%", height: "75%" },
     hAxis: { title: "Time", format: "HH:mm" },
     vAxis: { title: "Generated Power (Watts)", viewWindow: { min: 0 } },
-    annotations: { style: "point" },
+
+    // 🔴 THIS MAKES ⚠ RED & BIG
+    annotations: {
+      style: "point",
+      alwaysOutside: true,
+      textStyle: {
+        color: "#dc2626",   // strong red
+        fontSize: 18,
+        bold: true,
+      },
+    },
   });
 }
+
 
 /* ---------- SUMMARY ---------- */
 
