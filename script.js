@@ -79,29 +79,24 @@ document.getElementById("monthViewBtn").addEventListener("click", () => {
 
 // When user clicks OK after selecting month & year
 document.getElementById("mvOkBtn").addEventListener("click", async () => {
+  document.getElementById("monthLoader").style.display = "block";
+  document.getElementById("monthlyBarChartContainer").style.display = "none";
+
   const month = parseInt(document.getElementById("mvMonth").value);
   const year = parseInt(document.getElementById("mvYear").value);
 
-  // Show loading
-  document.getElementById("monthlyBarChartContainer").style.display = "block";
-  document.getElementById("monthlyBarChart").innerHTML = "Loading...";
+  const result = await fetchMonthlyMaxWatts(month, year);
 
-  try {
-    const data = await fetchExistingMonthlyData(month, year);
+  document.getElementById("monthLoader").style.display = "none";
 
-    if (!data.length) {
-      alert("No data found for the selected month and year");
-      document.getElementById("monthlyBarChartContainer").style.display = "none";
-      return;
-    }
-
-    drawMonthlyMaxBarChart(data, month, year);
-  } catch (err) {
-    console.error(err);
-    alert("Error fetching monthly data");
-    document.getElementById("monthlyBarChartContainer").style.display = "none";
+  if (!result.length) {
+    alert("No data available for selected month and year");
+    return;
   }
+
+  drawMonthlyMaxBarChart(result, month, year);
 });
+
 
 // Optimized fetch: only existing sheets, parallel requests
 async function fetchExistingMonthlyData(month, year) {
@@ -489,41 +484,61 @@ function populateMonthViewYears() {
 }
 
 async function fetchMonthlyMaxWatts(month, year) {
-  const results = [];
-  const daysInMonth = new Date(year, month, 0).getDate();
+  const today = new Date();
+  const isCurrentMonth =
+    today.getFullYear() === year && today.getMonth() + 1 === month;
 
-  for (let d = 1; d <= daysInMonth; d++) {
+  const lastDayAllowed = isCurrentMonth
+    ? today.getDate()
+    : new Date(year, month, 0).getDate();
+
+  const requests = [];
+
+  for (let d = 1; d <= lastDayAllowed; d++) {
     const day = String(d).padStart(2, "0");
-    const dateStr = `${year}-${String(month).padStart(2,"0")}-${day}`;
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${day}`;
     const sheetName = SHEET_PREFIX + dateStr;
 
-    try {
+    const req = new Promise(resolve => {
       const query = new google.visualization.Query(
         `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`
       );
+
       query.setQuery("SELECT B WHERE B IS NOT NULL");
 
-      const response = await new Promise((resolve, reject) => {
-        query.send(res => res.isError() ? reject() : resolve(res));
+      query.send(res => {
+        if (res.isError()) {
+          resolve(null); // ❌ missing sheet → ignore
+          return;
+        }
+
+        const data = res.getDataTable();
+        if (!data || data.getNumberOfRows() === 0) {
+          resolve(null);
+          return;
+        }
+
+        let maxVal = 0;
+        for (let i = 0; i < data.getNumberOfRows(); i++) {
+          maxVal = Math.max(maxVal, data.getValue(i, 0));
+        }
+
+        resolve({
+          label: `${d} ${new Date(year, month - 1, d).toLocaleString("en", { month: "short" })}`,
+          value: maxVal
+        });
       });
+    });
 
-      const data = response.getDataTable();
-      if (!data || data.getNumberOfRows() === 0) continue;
-
-      let maxVal = 0;
-      for (let i = 0; i < data.getNumberOfRows(); i++) {
-        const v = data.getValue(i, 0);
-        if (v > maxVal) maxVal = v;
-      }
-
-      results.push({ day: d, maxVal });
-    } catch (e) {
-      continue; // missing sheet → ignore
-    }
+    requests.push(req);
   }
 
-  return results;
+  const results = await Promise.all(requests);
+
+  // ✅ keep ONLY existing dates
+  return results.filter(Boolean);
 }
+
 
 function drawMonthlyMaxBarChart(dataArr, month, year) {
   const container = document.getElementById("monthlyBarChartContainer");
@@ -534,21 +549,28 @@ function drawMonthlyMaxBarChart(dataArr, month, year) {
   dt.addColumn("number", "Max Watts Total");
 
   dataArr.forEach(d => {
-    dt.addRow([String(d.day), d.maxVal]);
+    dt.addRow([d.label, d.value]);
   });
 
   const options = {
     title: `Daily Max Watts Total - ${month}/${year}`,
     legend: "none",
-    height: 400,
-    vAxis: { minValue: 0 },
-    bar: { groupWidth: "60%" },
-    colors: ["#0072ff"]
+    height: 450,
+    chartArea: { left: 70, right: 30, top: 60, bottom: 70 },
+    hAxis: {
+      slantedText: false
+    },
+    vAxis: {
+      minValue: 0
+    },
+    bar: { groupWidth: "65%" }
   };
 
   const chart = new google.visualization.ColumnChart(
     document.getElementById("monthlyBarChart")
   );
+
   chart.draw(dt, options);
 }
+
 }

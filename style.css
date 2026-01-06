@@ -558,3 +558,15 @@ div#custom_legend {
   width: 100%;
   height: 420px;
 }
+
+#monthlyBarChartContainer {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  transition: height 0.3s ease;
+}
+
+#monthlyBarChart {
+  width: 100%;
+  height: 450px;
+}
