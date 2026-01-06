@@ -77,19 +77,120 @@ document.getElementById("monthViewBtn").addEventListener("click", () => {
   document.getElementById("monthViewPopup").style.display = "flex";
 });
 
+// When user clicks OK after selecting month & year
 document.getElementById("mvOkBtn").addEventListener("click", async () => {
   const month = parseInt(document.getElementById("mvMonth").value);
   const year = parseInt(document.getElementById("mvYear").value);
 
-  const data = await fetchExistingDatesMaxWatts(month, year);
+  // Show loading
+  document.getElementById("monthlyBarChartContainer").style.display = "block";
+  document.getElementById("monthlyBarChart").innerHTML = "Loading...";
 
-  if (!data.length) {
-    alert("No data found for selected month and year");
+  try {
+    const data = await fetchExistingMonthlyData(month, year);
+
+    if (!data.length) {
+      alert("No data found for the selected month and year");
+      document.getElementById("monthlyBarChartContainer").style.display = "none";
+      return;
+    }
+
+    drawMonthlyMaxBarChart(data, month, year);
+  } catch (err) {
+    console.error(err);
+    alert("Error fetching monthly data");
     document.getElementById("monthlyBarChartContainer").style.display = "none";
-    return;
   }
-  drawMonthlyMaxBarChart(data, month, year);
 });
+
+// Optimized fetch: only existing sheets, parallel requests
+async function fetchExistingMonthlyData(month, year) {
+  const results = [];
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const baseUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=`;
+
+  const promises = [];
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayStr = String(d).padStart(2, "0");
+    const monthStr = String(month).padStart(2, "0");
+    const dateStr = `${year}-${monthStr}-${dayStr}`;
+    const sheetName = SHEET_PREFIX + dateStr;
+
+    const queryUrl = `${baseUrl}${encodeURIComponent(sheetName)}`;
+    const query = new google.visualization.Query(queryUrl);
+    query.setQuery("SELECT B WHERE B IS NOT NULL");
+
+    promises.push(new Promise((resolve) => {
+      query.send((res) => {
+        try {
+          if (res.isError()) return resolve(null); // sheet missing
+          const data = res.getDataTable();
+          if (!data || data.getNumberOfRows() === 0) return resolve(null);
+
+          // Get max value from column B
+          let maxVal = 0;
+          for (let i = 0; i < data.getNumberOfRows(); i++) {
+            const val = data.getValue(i, 0);
+            if (val > maxVal) maxVal = val;
+          }
+
+          resolve({ day: d, maxVal });
+        } catch {
+          resolve(null);
+        }
+      });
+    }));
+  }
+
+  const allResults = await Promise.all(promises);
+
+  // Only keep sheets that exist
+  allResults.forEach(r => {
+    if (r) results.push(r);
+  });
+
+  return results;
+}
+
+// Draw the bar chart
+function drawMonthlyMaxBarChart(dataArr, month, year) {
+  const dt = new google.visualization.DataTable();
+  dt.addColumn("string", "Date");
+  dt.addColumn("number", "Max Watts Total");
+
+  dataArr.forEach(d => dt.addRow([String(d.day), d.maxVal]));
+
+  const options = {
+    title: `Daily Max Watts Total - ${month}/${year}`,
+    legend: "none",
+    height: 400,
+    vAxis: { minValue: 0 },
+    bar: { groupWidth: "60%" },
+    colors: ["#0072ff"]
+  };
+
+  const chart = new google.visualization.ColumnChart(
+    document.getElementById("monthlyBarChart")
+  );
+
+  chart.draw(dt, options);
+}
+
+// document.getElementById("mvOkBtn").addEventListener("click", async () => {
+//   const month = parseInt(document.getElementById("mvMonth").value);
+//   const year = parseInt(document.getElementById("mvYear").value);
+
+//   const data = await fetchExistingDatesMaxWatts(month, year);
+
+//   if (!data.length) {
+//     alert("No data found for selected month and year");
+//     document.getElementById("monthlyBarChartContainer").style.display = "none";
+//     return;
+//   }
+//   drawMonthlyMaxBarChart(data, month, year);
+// });
+
 
 async function fetchExistingDatesMaxWatts(month, year) {
   const results = [];
