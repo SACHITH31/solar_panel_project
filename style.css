@@ -532,3 +532,29 @@ div#custom_legend {
   width: 100%;
   height: 400px;
 }
+.month-popup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.month-popup-content {
+  background: #ffffff;
+  padding: 16px 20px;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#monthlyBarChartContainer {
+  width: 100%;
+  max-width: 900px;
+}
+
+#monthlyBarChart {
+  width: 100%;
+  height: 420px;
+}
