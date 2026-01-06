@@ -5,9 +5,7 @@ const SHEET_PREFIX = "EEE Block-1 Solar Data_Slave_1_";
 const POLLING_INTERVAL = 120000;
 
 let pollingTimer = null;
-let isLive = false;
 let lastDataTable = null;
-
 const detectedEventSet = new Set();
 
 const METRIC_COLUMNS = [
@@ -22,8 +20,7 @@ const METRIC_COLUMNS = [
 
 google.charts.setOnLoadCallback(init);
 
-/* ---------- UI HELPERS (NON-LOGIC) ---------- */
-
+/* ---------- UI HELPERS ---------- */
 function showLoading() {
   let loader = document.getElementById("loader");
   if (!loader) {
@@ -57,7 +54,6 @@ function clearError() {
 }
 
 /* ---------- INIT ---------- */
-
 function init() {
   const today = getTodayDate();
   document.getElementById("datePicker").value = today;
@@ -74,10 +70,68 @@ function init() {
   window.addEventListener("resize", () => {
     if (lastDataTable) drawChart(lastDataTable);
   });
+
+  // Month View button setup
+document.getElementById("monthViewBtn").addEventListener("click", () => {
+  populateMonthViewYears();
+  document.getElementById("monthViewPopup").style.display = "flex";
+});
+
+document.getElementById("mvOkBtn").addEventListener("click", async () => {
+  const month = parseInt(document.getElementById("mvMonth").value);
+  const year = parseInt(document.getElementById("mvYear").value);
+
+  const data = await fetchExistingDatesMaxWatts(month, year);
+
+  if (!data.length) {
+    alert("No data found for selected month and year");
+    document.getElementById("monthlyBarChartContainer").style.display = "none";
+    return;
+  }
+  drawMonthlyMaxBarChart(data, month, year);
+});
+
+async function fetchExistingDatesMaxWatts(month, year) {
+  const results = [];
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayStr = String(d).padStart(2, "0");
+    const monthStr = String(month).padStart(2, "0");
+    const dateStr = `${year}-${monthStr}-${dayStr}`;
+    const sheetName = `${SHEET_PREFIX}${dateStr}`;
+
+    try {
+      const query = new google.visualization.Query(
+        `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`
+      );
+      query.setQuery("SELECT B WHERE B IS NOT NULL");
+
+      const response = await new Promise((resolve, reject) => {
+        query.send(res => res.isError() ? reject() : resolve(res));
+      });
+
+      const data = response.getDataTable();
+      if (!data || data.getNumberOfRows() === 0) continue;
+
+      let maxVal = 0;
+      for (let i = 0; i < data.getNumberOfRows(); i++) {
+        const v = data.getValue(i, 0);
+        if (v > maxVal) maxVal = v;
+      }
+
+      results.push({ day: d, maxVal }); // only push if sheet exists
+
+    } catch (e) {
+      // ignore missing sheets
+      continue;
+    }
+  }
+
+  return results;
 }
 
 /* ---------- DATE HANDLING ---------- */
-
 function onDateSelect() {
   const selectedDate = document.getElementById("datePicker").value;
   if (!selectedDate) return;
@@ -104,7 +158,6 @@ function onDateSelect() {
 }
 
 /* ---------- DATA LOADING ---------- */
-
 function loadData(dateValue) {
   clearError();
   showLoading();
@@ -113,14 +166,9 @@ function loadData(dateValue) {
   const query = new google.visualization.Query(
     `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`
   );
-
-  query.setQuery(
-    `SELECT A, B, F, J, N, V, Z, AA, AB WHERE A IS NOT NULL AND B IS NOT NULL`
-  );
-
+  query.setQuery(`SELECT A, B, F, J, N, V, Z, AA, AB WHERE A IS NOT NULL AND B IS NOT NULL`);
   query.send((response) => {
     hideLoading();
-
     if (response.isError()) {
       clearUI();
       showError(`No data available for ${dateValue}`);
@@ -149,7 +197,6 @@ function loadData(dateValue) {
 }
 
 /* ---------- CHART ---------- */
-
 function drawChart(data) {
   let cols = data.getNumberOfColumns();
   if (cols === 9) {
@@ -187,23 +234,15 @@ function drawChart(data) {
     chartArea: { left: 80, top: 50, width: "85%", height: "75%" },
     hAxis: { title: "Time", format: "HH:mm" },
     vAxis: { title: "Generated Power (Watts)", viewWindow: { min: 0 } },
-
-    // 🔴 THIS MAKES ⚠ RED & BIG
     annotations: {
       style: "point",
       alwaysOutside: true,
-      textStyle: {
-        color: "#dc2626",   // strong red
-        fontSize: 18,
-        bold: true,
-      },
+      textStyle: { color: "#dc2626", fontSize: 18, bold: true },
     },
   });
 }
 
-
 /* ---------- SUMMARY ---------- */
-
 function showLiveWatt(data) {
   const last = data.getNumberOfRows() - 1;
   const watt = (data.getValue(last, 1) / 1000).toFixed(2);
@@ -216,11 +255,9 @@ function showTotalPower(data) {
   for (let i = 0; i < data.getNumberOfRows(); i++) {
     total += data.getValue(i, 1);
   }
-
   const totalKwh = total / 1000;
   document.getElementById("total_power").innerHTML =
     `☀️ Solar Energy Today : <strong>${totalKwh.toFixed(2)} kWh</strong>`;
-
   showCO2Saved(totalKwh);
 }
 
@@ -234,9 +271,7 @@ function updateInverterHealth(data) {
   let last = null, maxDrop = 0;
   for (let i = 0; i < data.getNumberOfRows(); i++) {
     const p = data.getValue(i, 1);
-    if (last && p < last) {
-      maxDrop = Math.max(maxDrop, ((last - p) / last) * 100);
-    }
+    if (last && p < last) maxDrop = Math.max(maxDrop, ((last - p) / last) * 100);
     last = p;
   }
   document.getElementById("inverter-health").innerHTML =
@@ -244,17 +279,13 @@ function updateInverterHealth(data) {
 }
 
 /* ---------- EVENTS ---------- */
-
 function detectPowerEvents(data) {
   let last = null;
   const DROP_THRESHOLD = 15000;
-
   for (let i = 0; i < data.getNumberOfRows(); i++) {
     const p = data.getValue(i, 1);
     const t = data.getValue(i, 0);
-    if (last && last - p > DROP_THRESHOLD) {
-      detectedEventSet.add(`${t} - Sudden Drop`);
-    }
+    if (last && last - p > DROP_THRESHOLD) detectedEventSet.add(`${t} - Sudden Drop`);
     last = p;
   }
   displayEvents();
@@ -264,18 +295,12 @@ function displayEvents() {
   const el = document.getElementById("events");
   el.innerHTML = "";
   if (!detectedEventSet.size) return;
-
   const ul = document.createElement("ul");
-  detectedEventSet.forEach(e => {
-    const li = document.createElement("li");
-    li.textContent = e;
-    ul.appendChild(li);
-  });
+  detectedEventSet.forEach(e => { const li = document.createElement("li"); li.textContent = e; ul.appendChild(li); });
   el.appendChild(ul);
 }
 
 /* ---------- LIVE ---------- */
-
 function startPolling(date) {
   stopPolling();
   setLiveStatus();
@@ -283,10 +308,7 @@ function startPolling(date) {
 }
 
 function stopPolling() {
-  if (pollingTimer) {
-    clearInterval(pollingTimer);
-    pollingTimer = null;
-  }
+  if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
 }
 
 function setLiveStatus() {
@@ -300,7 +322,6 @@ function setHistoricalStatus() {
 }
 
 /* ---------- UTIL ---------- */
-
 function clearUI() {
   document.getElementById("chart_div").innerHTML = "";
   document.getElementById("events").innerHTML = "";
@@ -323,7 +344,6 @@ function isDateInRange(dateStr) {
 }
 
 /* ---------- DOWNLOAD ---------- */
-
 function downloadDashboardSection() {
   const area = document.getElementById("download-area");
   html2canvas(area, { scale: 2 }).then(canvas => {
@@ -335,7 +355,6 @@ function downloadDashboardSection() {
 }
 
 /* ---------- METRICS ---------- */
-
 function getLastNonNullInColumn(data, col) {
   for (let i = data.getNumberOfRows() - 1; i >= 0; i--) {
     const v = data.getValue(i, col);
@@ -347,7 +366,6 @@ function getLastNonNullInColumn(data, col) {
 function updateLatestMetricsTable(data) {
   const tbody = document.querySelector("#latestMetricsTable tbody");
   tbody.innerHTML = "";
-
   METRIC_COLUMNS.forEach(c => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${c.label}</td><td>${getLastNonNullInColumn(data, c.index)}</td>`;
@@ -355,20 +373,12 @@ function updateLatestMetricsTable(data) {
   });
 }
 
-// Show Month Popup on Download button click
-document.getElementById("downloadBtn").addEventListener("click", () => {
-   downloadDashboardSection();
-  // document.getElementById("monthPopup").style.display = "flex";
-});
-
-
+/* ---------- MONTH VIEW LOGIC ---------- */
 function populateMonthViewYears() {
   const yearSelect = document.getElementById("mvYear");
   yearSelect.innerHTML = "";
-
   const startYear = 2025;
   const endYear = new Date().getFullYear();
-
   for (let y = startYear; y <= endYear; y++) {
     const opt = document.createElement("option");
     opt.value = y;
@@ -377,22 +387,6 @@ function populateMonthViewYears() {
   }
 }
 
-document.getElementById("mvOkBtn").addEventListener("click", async () => {
-  const month = parseInt(document.getElementById("mvMonth").value);
-  const year = parseInt(document.getElementById("mvYear").value);
-
-  const data = await fetchMonthlyMaxWatts(month, year);
-
-  if (!data || data.length === 0) {
-    alert("No data found for selected month and year");
-    document.getElementById("monthlyBarChartContainer").style.display = "none";
-    return;
-  }
-
-  drawMonthlyMaxBarChart(data, month, year);
-});
-
-
 async function fetchMonthlyMaxWatts(month, year) {
   const results = [];
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -400,13 +394,12 @@ async function fetchMonthlyMaxWatts(month, year) {
   for (let d = 1; d <= daysInMonth; d++) {
     const day = String(d).padStart(2, "0");
     const dateStr = `${year}-${String(month).padStart(2,"0")}-${day}`;
-    const sheetName = `${SHEET_PREFIX}${dateStr}`;
+    const sheetName = SHEET_PREFIX + dateStr;
 
     try {
       const query = new google.visualization.Query(
         `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`
       );
-
       query.setQuery("SELECT B WHERE B IS NOT NULL");
 
       const response = await new Promise((resolve, reject) => {
@@ -423,7 +416,6 @@ async function fetchMonthlyMaxWatts(month, year) {
       }
 
       results.push({ day: d, maxVal });
-
     } catch (e) {
       continue; // missing sheet → ignore
     }
@@ -433,7 +425,8 @@ async function fetchMonthlyMaxWatts(month, year) {
 }
 
 function drawMonthlyMaxBarChart(dataArr, month, year) {
-  document.getElementById("monthlyBarChartContainer").style.display = "block";
+  const container = document.getElementById("monthlyBarChartContainer");
+  container.style.display = "block";
 
   const dt = new google.visualization.DataTable();
   dt.addColumn("string", "Date");
@@ -455,12 +448,6 @@ function drawMonthlyMaxBarChart(dataArr, month, year) {
   const chart = new google.visualization.ColumnChart(
     document.getElementById("monthlyBarChart")
   );
-
   chart.draw(dt, options);
 }
-
-document.getElementById("monthViewBtn").addEventListener("click", () => {
-  const popup = document.getElementById("monthViewPopup");
-  popup.style.display = popup.style.display === "none" ? "flex" : "none";
-  populateMonthViewYears(); // populate year dropdown every time
-});
+}
