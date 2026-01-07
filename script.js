@@ -345,7 +345,6 @@ function showLoading() {
     loader = document.createElement("div");
     loader.id = "loader";
     loader.style.textAlign = "center";
-    loader.innerText = "Loading data...";
     document.querySelector(".chart-card").prepend(loader);
   }
 }
@@ -418,17 +417,88 @@ function detectPowerEvents(data) {
   displayEvents();
 }
 
+/* ---------- POPUP CONTROL ---------- */
+/* ---------- POPUP CONTROL ---------- */
+// function displayEvents() {
+//     const el = document.getElementById("events");
+//     el.innerHTML = ""; // Clear current messages
+
+//     if (detectedEventSet.size === 0) {
+//         // meaningful message if no errors occurred
+//         el.innerHTML = `
+//             <div style="text-align: center; padding: 20px; color: #059669; background: #ecfdf5; border-radius: 8px; border: 1px solid #10b981;">
+//                 <i class="fas fa-check-circle"></i> No error detections or sudden power drops occurred for this day.
+//             </div>`;
+//     } else {
+//         // Display actual errors found in detectedEventSet
+//         const ul = document.createElement("ul");
+//         ul.className = "event-list";
+//         detectedEventSet.forEach((e) => {
+//             const li = document.createElement("li");
+//             li.style.color = "#b91c1c";
+//             li.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${e}`;
+//             ul.appendChild(li);
+//         });
+//         el.appendChild(ul);
+//     }
+// }
+
 function displayEvents() {
-  const el = document.getElementById("events");
-  el.innerHTML = "";
-  if (!detectedEventSet.size) return;
-  const ul = document.createElement("ul");
-  detectedEventSet.forEach((e) => {
-    const li = document.createElement("li");
-    li.textContent = e;
-    ul.appendChild(li);
-  });
-  el.appendChild(ul);
+    const eventsSection = document.getElementById("events");
+    const messageContainer = document.getElementById("event-message");
+    
+    // Clear the container first
+    messageContainer.innerHTML = "";
+
+    // 1. CHECK IF THERE ARE NO ERRORS
+    if (!detectedEventSet || detectedEventSet.size === 0) {
+        // Change the WHOLE section to green and remove red borders
+        eventsSection.style.backgroundColor = "#ecfdf5"; // Success light green
+        eventsSection.style.border = "1px solid #10b981"; // Strong green border
+        eventsSection.style.boxShadow = "none";
+        
+        messageContainer.innerHTML = `
+            <div style="color: #065f46; font-weight: 500; text-align: center; padding: 10px;">
+                <i class="fas fa-check-circle"></i> No error detections or sudden power drops occurred for this day.
+            </div>`;
+    } 
+    // 2. IF ERRORS EXIST
+    else {
+        // Change the WHOLE section to red
+        eventsSection.style.backgroundColor = "#fef2f2"; // Error light red
+        eventsSection.style.border = "1px solid #ef4444"; // Strong red border
+        
+        const title = document.createElement("h4");
+        title.style.color = "#b91c1c";
+        title.style.marginBottom = "10px";
+        title.innerText = "System Alerts Detected:";
+        messageContainer.appendChild(title);
+
+        const ul = document.createElement("ul");
+        ul.style.margin = "0";
+        ul.style.paddingLeft = "20px";
+        detectedEventSet.forEach(event => {
+            const li = document.createElement("li");
+            li.style.color = "#b91c1c";
+            li.style.marginBottom = "5px";
+            li.innerText = event;
+            ul.appendChild(li);
+        });
+        messageContainer.appendChild(ul);
+    }
+}
+
+// In your close function
+function closeMonthPopup() {
+    document.getElementById("monthViewPopup").style.display = "none";
+}
+
+/* ---------- RESET ON DATE CHANGE ---------- */
+// Add this inside your onDateSelect() or loadData() function 
+// to ensure errors don't "carry over" to the next day
+function clearPreviousEvents() {
+    detectedEventSet.clear();
+    document.getElementById("events").innerHTML = "";
 }
 
 /* ---------- DOWNLOAD DASHBOARD AS PDF (OPTIMIZED) ---------- */
@@ -502,4 +572,40 @@ function isDateInRange(dateStr) {
   const min = new Date("2025-11-22");
   const max = new Date(getTodayDate());
   return d >= min && d <= max;
+}
+
+/**
+ * Updates the events section based on detected data.
+ * @param {Set|Array} detectedEvents - The set of detected error strings.
+ */
+function updateEventsDisplay(detectedEvents) {
+    const eventContainer = document.getElementById("events");
+    const messageDiv = document.getElementById("event-message");
+
+    // 1. If there are no errors, show the "All Clear" message
+    if (!detectedEvents || detectedEvents.size === 0) {
+        eventContainer.style.backgroundColor = "#f0fdf4"; // Success Green
+        eventContainer.style.border = "1px solid #bbf7d0";
+        messageDiv.innerHTML = `
+            <div style="color: #166534; font-weight: 500; text-align: center;">
+                ✅ No error detections or sudden power drops occurred for this day.
+            </div>`;
+    } 
+    // 2. If errors exist, show them in the red alert style
+    else {
+        eventContainer.style.backgroundColor = "#fef2f2"; // Error Red
+        eventContainer.style.border = "1px solid #fee2e2";
+        
+        let errorList = `<h4 style="color: #991b1b; margin-bottom: 8px;">System Events Detected:</h4><ul>`;
+        detectedEvents.forEach(err => {
+            errorList += `<li style="color: #b91c1c; margin-bottom: 4px;">${err}</li>`;
+        });
+        errorList += `</ul>`;
+        messageDiv.innerHTML = errorList;
+    }
+}
+
+// Call this inside your onDateSelect() to reset UI before loading new data
+function resetDashboardUI() {
+    document.getElementById("event-message").innerText = "Analyzing system data...";
 }

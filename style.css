@@ -593,3 +593,24 @@ button:disabled {
     opacity: 0.7;
     cursor: not-allowed;
 }
+
+.event-card {
+    margin-top: 20px;
+    padding: 20px;
+    border-radius: 8px;
+    transition: all 0.3s ease; /* Smooth color transition when changing dates */
+}
+
+/* Ensure the inner message doesn't have its own separate background */
+#event-message {
+    background: transparent !important;
+}
+.close-popup {
+  cursor: pointer;
+}
+#mvMonth, #mvYear, option {
+  cursor: pointer;
+}
+option {
+  cursor: pointer;
+}

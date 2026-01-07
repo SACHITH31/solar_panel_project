@@ -64,6 +64,9 @@
       </section>
       <div id="monthViewPopup" class="month-popup" style="display: none">
         <!-- Controls -->
+        <div class="closeContainer">
+          <span class="close-popup" onclick="closeMonthPopup()">&times;</span>
+        </div>
         <div class="month-popup-content">
           <label>Month:</label>
           <select id="mvMonth">
@@ -95,7 +98,6 @@
         <div id="monthlyBarChartContainer" style="display: none">
           <div id="monthlyBarChart"></div>
         </div>
-
         <!-- Chart BELOW controls -->
         <div id="monthlyBarChartContainer" style="display: none">
           <div id="monthlyBarChart"></div>
@@ -142,7 +144,9 @@
         </section>
       </div>
       <!-- Events -->
-      <section id="events" class="event-card"></section>
+      <section id="events" class="event-card">
+        <div id="event-message">No error detections occurred.</div>
+      </section> 
     </div>
 
     <script src="script.js"></script>
