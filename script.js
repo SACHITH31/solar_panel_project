@@ -409,15 +409,60 @@ function displayEvents() {
   el.appendChild(ul);
 }
 
-/* ---------- DOWNLOAD & UTILS ---------- */
-function downloadDashboardSection() {
-  const area = document.getElementById("download-area");
-  html2canvas(area, { scale: 2 }).then((canvas) => {
-    const link = document.createElement("a");
-    link.href = canvas.toDataURL("image/png");
-    link.download = `solar-dashboard-${document.getElementById("datePicker").value}.png`;
-    link.click();
-  });
+/* ---------- DOWNLOAD DASHBOARD AS PDF ---------- */
+async function downloadDashboardSection() {
+    const area = document.getElementById("download-area");
+    const dateValue = document.getElementById("datePicker").value;
+    
+    // Show a small "Processing" toast or console log if needed
+    console.log("Generating PDF...");
+
+    try {
+        // 1. Capture the dashboard as a high-res canvas
+        const canvas = await html2canvas(area, { 
+            scale: 2, // Keeps text sharp
+            useCORS: true,
+            logging: false
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+        
+        // 2. Initialize jsPDF (Orientation: Portrait, Unit: mm, Format: A4)
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF("p", "mm", "a4");
+
+        // 3. Calculate Dimensions to fit A4 paper
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        
+        const margin = 10; // 10mm margins
+        const maxLineWidth = pageWidth - (margin * 2);
+        
+        const imgProps = pdf.getImageProperties(imgData);
+        const ratio = imgProps.height / imgProps.width;
+        const imgHeight = maxLineWidth * ratio;
+
+        // 4. Add Header Text to PDF
+        pdf.setFontSize(16);
+        pdf.setTextColor(26, 115, 232); // Google Blue
+        pdf.text("Solar Data Report", margin, 15);
+        
+        pdf.setFontSize(10);
+        pdf.setTextColor(100);
+        pdf.text(`Generated Date: ${new Date().toLocaleString()}`, margin, 22);
+        pdf.text(`Data for: ${dateValue}`, margin, 27);
+
+        // 5. Add the Dashboard Image
+        // Parameters: x, y, width, height
+        pdf.addImage(imgData, 'PNG', margin, 35, maxLineWidth, imgHeight);
+
+        // 6. Save the file
+        pdf.save(`solar-report-${dateValue}.pdf`);
+
+    } catch (error) {
+        console.error("PDF Generation failed:", error);
+        alert("Sorry, could not generate PDF. Check console for details.");
+    }
 }
 
 function getTodayDate() { return new Date().toISOString().split("T")[0]; }
