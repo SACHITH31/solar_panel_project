@@ -38,26 +38,29 @@ function init() {
     if (lastDataTable) drawChart(lastDataTable);
   });
 
-  // Month View button setup
   document.getElementById("monthViewBtn").addEventListener("click", () => {
     populateMonthViewYears();
     document.getElementById("monthViewPopup").style.display = "flex";
   });
 
-  // When user clicks OK after selecting month & year
   document.getElementById("mvOkBtn").addEventListener("click", async () => {
-    document.getElementById("monthLoader").style.display = "block";
-    document.getElementById("monthlyBarChartContainer").style.display = "none";
+    const loader = document.getElementById("monthLoader");
+    const chartContainer = document.getElementById("monthlyBarChartContainer");
+    const chartDiv = document.getElementById("monthlyBarChart");
+
+    loader.style.display = "block";
+    chartContainer.style.display = "none";
+    chartDiv.innerHTML = ""; 
 
     const month = parseInt(document.getElementById("mvMonth").value);
     const year = parseInt(document.getElementById("mvYear").value);
 
     const data = await fetchMonthlyMaxWatts(month, year);
 
-    document.getElementById("monthLoader").style.display = "none";
+    loader.style.display = "none";
 
-    if (!data.length) {
-      alert(`No data found for ${month}/${year}`);
+    if (!data || data.length === 0) {
+      alert(`No solar data recorded for ${document.getElementById("mvMonth").options[month-1].text} ${year}.`);
       return;
     }
 
@@ -118,13 +121,11 @@ function loadData(dateValue) {
     }
 
     lastDataTable = data;
-
     drawChart(data);
     showLiveWatt(data);
     showTotalPower(data);
     updateInverterHealth(data);
     updateLatestMetricsTable(data);
-
     detectedEventSet.clear();
     detectPowerEvents(data);
     updateLastUpdatedTime();
@@ -134,7 +135,6 @@ function loadData(dateValue) {
 /* ---------- CHART ---------- */
 function drawChart(data) {
   let cols = data.getNumberOfColumns();
-  // Ensure we don't add duplicate columns if redrawing
   if (cols === 9) {
     data.addColumn({ type: "string", role: "annotation" });
     data.addColumn({ type: "string", role: "annotationText" });
@@ -176,11 +176,10 @@ function drawChart(data) {
   });
 }
 
-/* ---------- MONTH VIEW LOGIC ---------- */
+/* ---------- MONTH VIEW LOGIC (BUG FIXED) ---------- */
 async function fetchMonthlyMaxWatts(month, year) {
-  const results = [];
   const today = new Date();
-  const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
+  const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
   const maxDay = isCurrentMonth ? today.getDate() : new Date(year, month, 0).getDate();
 
   const requests = [];
@@ -193,33 +192,42 @@ async function fetchMonthlyMaxWatts(month, year) {
 
     requests.push(
       new Promise((resolve) => {
-        const query = new google.visualization.Query(
-          `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`
-        );
+        const queryUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`;
+        const query = new google.visualization.Query(queryUrl);
         query.setQuery("SELECT B WHERE B IS NOT NULL");
+        
         query.send((res) => {
-          if (res.isError()) return resolve(null);
-          const data = res.getDataTable();
-          if (!data || data.getNumberOfRows() === 0) return resolve(null);
+          if (res.isError()) return resolve(null); // Skips if sheet doesn't exist
 
-          let maxVal = 0;
-          for (let i = 0; i < data.getNumberOfRows(); i++) {
-            const v = data.getValue(i, 0);
-            if (typeof v === "number" && v > maxVal) maxVal = v;
+          const dataTable = res.getDataTable();
+          if (!dataTable || dataTable.getNumberOfRows() === 0) return resolve(null);
+
+          let dailyMax = 0;
+          let hasValues = false;
+
+          for (let i = 0; i < dataTable.getNumberOfRows(); i++) {
+            const val = dataTable.getValue(i, 0);
+            if (typeof val === "number" && val > 0) {
+              if (val > dailyMax) dailyMax = val;
+              hasValues = true;
+            }
           }
-          resolve({
-            day: d,
-            label: `${d} ${new Date(year, month - 1, d).toLocaleString("en", { month: "short" })}`,
-            value: maxVal,
-          });
+
+          if (hasValues && dailyMax > 0) {
+            resolve({
+              label: `${d} ${new Date(year, month - 1, d).toLocaleString("en", { month: "short" })}`,
+              value: dailyMax
+            });
+          } else {
+            resolve(null);
+          }
         });
       })
     );
   }
 
   const resolved = await Promise.all(requests);
-  resolved.forEach((r) => { if (r) results.push(r); });
-  return results;
+  return resolved.filter(day => day !== null); // STOPS FLAT BARS BUG
 }
 
 function drawMonthlyMaxBarChart(dataArr, month, year) {
@@ -228,18 +236,19 @@ function drawMonthlyMaxBarChart(dataArr, month, year) {
 
   const dt = new google.visualization.DataTable();
   dt.addColumn("string", "Date");
-  dt.addColumn("number", "Max Watts Total");
+  dt.addColumn("number", "Max Watts");
 
-  dataArr.forEach((d) => { dt.addRow([d.label, d.value]); });
+  dt.addRows(dataArr.map(d => [d.label, d.value]));
 
   const options = {
-    title: `Daily Max Watts Total - ${month}/${year}`,
+    title: `Daily Peak Power Generation - ${month}/${year}`,
     legend: "none",
     height: 450,
-    chartArea: { left: 70, right: 30, top: 60, bottom: 70 },
-    hAxis: { slantedText: false },
-    vAxis: { minValue: 0 },
-    bar: { groupWidth: "65%" },
+    chartArea: { left: 80, right: 30, top: 60, bottom: 80 },
+    hAxis: { title: "Date", slantedText: true, slantedTextAngle: 45 },
+    vAxis: { title: "Watts", minValue: 0, gridlines: { count: 6 } },
+    bar: { groupWidth: "70%" },
+    colors: ['#1a73e8']
   };
 
   const chart = new google.visualization.ColumnChart(document.getElementById("monthlyBarChart"));
