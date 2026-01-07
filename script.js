@@ -289,13 +289,35 @@ function showCO2Saved(totalKwh) {
 }
 
 function updateInverterHealth(data) {
-  let last = null, maxDrop = 0;
-  for (let i = 0; i < data.getNumberOfRows(); i++) {
-    const p = data.getValue(i, 1);
-    if (last && p < last) maxDrop = Math.max(maxDrop, ((last - p) / last) * 100);
-    last = p;
+  const healthEl = document.getElementById("inverter-health");
+  const rowCount = data.getNumberOfRows();
+  
+  // If there's only one row, we can't compare yet
+  if (rowCount < 2) {
+    healthEl.innerHTML = `🟢 Inverter Health : <strong>100%</strong>`;
+    return;
   }
-  document.getElementById("inverter-health").innerHTML = `🟢 Inverter Health : <strong>${(100 - maxDrop).toFixed(1)}%</strong>`;
+
+  // Get the two most recent power readings (Column 1 is Watts)
+  const currentPower = data.getValue(rowCount - 1, 1);
+  const previousPower = data.getValue(rowCount - 2, 1);
+
+  // Logic: Only calculate health if there is a drop
+  if (currentPower < previousPower && previousPower > 0) {
+    // Calculate how much it dropped as a percentage
+    const dropAmount = previousPower - currentPower;
+    const dropPercentage = (dropAmount / previousPower) * 100;
+    const healthScore = (100 - dropPercentage).toFixed(1);
+
+    // If the drop is huge (e.g., more than 50%), let's make it Red
+    const color = healthScore < 50 ? "#dc2626" : "#f59e0b"; // Red or Orange
+    const statusDot = healthScore < 50 ? "🔴" : "🟡";
+
+    healthEl.innerHTML = `${statusDot} Inverter Health : <strong style="color:${color}">${healthScore}%</strong> <small>(Drop: -${dropPercentage.toFixed(1)}%)</small>`;
+  } else {
+    // If power is steady or increasing, health is perfect
+    healthEl.innerHTML = `🟢 Inverter Health : <strong>100%</strong>`;
+  }
 }
 
 function updateLatestMetricsTable(data) {
