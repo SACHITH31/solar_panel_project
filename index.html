@@ -39,10 +39,6 @@
 
         <button id="monthViewBtn" class="download-btn">📊 Month View</button>
 
-        <div id="monthlyBarChartContainer" style="display: none">
-          <div id="monthlyBarChart"></div>
-        </div>
-
         <!-- <div class="date-nav-group">
           <button
             id="prevDateBtn"
@@ -65,42 +61,45 @@
           </button>
         </div> -->
       </section>
-        <div id="monthViewPopup" class="month-popup" style="display: none">
+      <div id="monthViewPopup" class="month-popup" style="display: none">
+        <!-- Controls -->
+        <div class="month-popup-content">
+          <label>Month:</label>
+          <select id="mvMonth">
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7">July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
 
-  <!-- Controls -->
-  <div class="month-popup-content">
-    <label>Month:</label>
-    <select id="mvMonth">
-      <option value="1">January</option>
-      <option value="2">February</option>
-      <option value="3">March</option>
-      <option value="4">April</option>
-      <option value="5">May</option>
-      <option value="6">June</option>
-      <option value="7">July</option>
-      <option value="8">August</option>
-      <option value="9">September</option>
-      <option value="10">October</option>
-      <option value="11">November</option>
-      <option value="12">December</option>
-    </select>
+          <label>Year:</label>
+          <select id="mvYear"></select>
 
-    <label>Year:</label>
-    <select id="mvYear"></select>
+          <button id="mvOkBtn" class="okButton">OK</button>
+        </div>
+        <div
+          id="monthLoader"
+          style="display: none; text-align: center; margin: 20px 0"
+        >
+          <span>Loading monthly data...</span>
+        </div>
+        <div id="monthlyBarChartContainer" style="display: none">
+          <div id="monthlyBarChart"></div>
+        </div>
 
-    <button id="mvOkBtn" class="okButton">OK</button>
-  </div>
-  <div id="monthLoader" style="display:none;text-align:center;margin:20px 0;">
-  <span>Loading monthly data...</span>
-</div>
-
-
-  <!-- Chart BELOW controls -->
-  <div id="monthlyBarChartContainer" style="display:none;">
-    <div id="monthlyBarChart"></div>
-  </div>
-
-</div>
+        <!-- Chart BELOW controls -->
+        <div id="monthlyBarChartContainer" style="display: none">
+          <div id="monthlyBarChart"></div>
+        </div>
+      </div>
       <!-- Main Chart -->
       <div id="download-area">
         <section class="chart-card">
