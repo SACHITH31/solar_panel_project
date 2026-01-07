@@ -9,11 +9,11 @@ let lastDataTable = null;
 const detectedEventSet = new Set();
 
 const METRIC_COLUMNS = [
+  { label: "Frequency", index: 6 },
   { label: "PF Avg (inst)", index: 2 },
   { label: "VA Total", index: 3 },
   { label: "VL N Average", index: 4 },
   { label: "Current Total", index: 5 },
-  { label: "Frequency", index: 6 },
   { label: "Wh", index: 7 },
   { label: "VAh", index: 8 },
 ];
