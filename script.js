@@ -435,67 +435,66 @@ function displayEvents() {
 async function downloadDashboardSection() {
     const btn = document.getElementById("downloadBtn");
     const btnText = document.getElementById("btnText");
-    const area = document.getElementById("download-area");
+    const mainArea = document.getElementById("download-area");
+    const eventsArea = document.getElementById("events"); // The missing section
     const dateValue = document.getElementById("datePicker").value;
     
-    // 1. UI LOADER: Disable button and show loading state
     btn.disabled = true;
-    const originalText = btnText.innerText;
-    btnText.innerHTML = `<span class="spinner"></span> Generating...`; 
-    // Note: Add a simple CSS spinner class for the "Attractive" look
+    btnText.innerHTML = `<span class="spinner"></span> Capturing Full Report...`;
 
     try {
-        // 2. SPEED OPTIMIZATION: 
-        // We use scale: 1.5 instead of 2.0 to significantly speed up processing 
-        // while maintaining professional readability.
-        const canvas = await html2canvas(area, { 
-            scale: 1.5, 
-            useCORS: true,
-            logging: false,
-            allowTaint: false,
-            imageTimeout: 0 // Prevents waiting too long for images
-        });
-
-        const imgData = canvas.toDataURL("image/jpeg", 0.75); // Using JPEG at 75% quality is much faster/smaller than PNG
-        
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF("p", "mm", "a4");
-
         const pageWidth = pdf.internal.pageSize.getWidth();
         const margin = 10;
         const maxLineWidth = pageWidth - (margin * 2);
-        
-        const imgProps = pdf.getImageProperties(imgData);
-        const ratio = imgProps.height / imgProps.width;
-        const imgHeight = maxLineWidth * ratio;
 
-        // 3. PROFESSIONAL HEADER
+        // 1. CAPTURE MAIN DASHBOARD
+        const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
+        const imgMain = canvasMain.toDataURL("image/jpeg", 0.85);
+        const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
+
+        // 2. CAPTURE EVENTS SECTION (The missing part)
+        const canvasEvents = await html2canvas(eventsArea, { scale: 2, useCORS: true });
+        const imgEvents = canvasEvents.toDataURL("image/jpeg", 0.85);
+        const eventsHeight = (maxLineWidth * canvasEvents.height) / canvasEvents.width;
+
+        // 3. ADD HEADER
         pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(18);
-        pdf.setTextColor(26, 115, 232); // Google Blue
-        pdf.text("SOLAR PERFORMANCE REPORT", margin, 15);
+        pdf.setFontSize(16);
+        pdf.setTextColor(26, 115, 232);
+        pdf.text("SOLAR PERFORMANCE & ERROR REPORT", margin, 15);
+        pdf.setFontSize(9);
+        pdf.setTextColor(100);
+        pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 21);
+        pdf.text(`Reported Date: ${dateValue}`, margin, 26);
+
+        // 4. ADD MAIN DASHBOARD
+        pdf.addImage(imgMain, 'JPEG', margin, 28, maxLineWidth, mainHeight);
+
+        // 5. ADD EVENTS SECTION BELOW
+        // Position it right after the main dashboard
+        const eventsYPosition = 28 + mainHeight + 5; 
         
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(10);
-        pdf.setTextColor(80);
-        pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 22);
-        pdf.text(`Report Date: ${dateValue}`, margin, 27);
+        // If it's too long for the first page, we add a new page
+        if (eventsYPosition + eventsHeight > 280) { 
+            pdf.addPage();
+            pdf.text("System Events & Errors (Continued)", margin, 15);
+            pdf.addImage(imgEvents, 'JPEG', margin, 25, maxLineWidth, eventsHeight);
+        } else {
+            pdf.addImage(imgEvents, 'JPEG', margin, eventsYPosition, maxLineWidth, eventsHeight);
+        }
 
-        // 4. DYNAMIC SCALING (Fits to A4)
-        pdf.addImage(imgData, 'JPEG', margin, 35, maxLineWidth, imgHeight);
-
-        pdf.save(`solar-report-${dateValue}.pdf`);
+        pdf.save(`Solar_Full_Report_${dateValue}.pdf`);
 
     } catch (error) {
         console.error("PDF Error:", error);
-        alert("Download failed.");
+        alert("Download failed. Check console for details.");
     } finally {
-        // 5. RESET UI: Re-enable button
         btn.disabled = false;
-        btnText.innerText = originalText;
+        btnText.innerText = "📝Download PDF";
     }
 }
-
 function getTodayDate() { return new Date().toISOString().split("T")[0]; }
 
 function isDateInRange(dateStr) {
