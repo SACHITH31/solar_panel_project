@@ -409,59 +409,68 @@ function displayEvents() {
   el.appendChild(ul);
 }
 
-/* ---------- DOWNLOAD DASHBOARD AS PDF ---------- */
+/* ---------- DOWNLOAD DASHBOARD AS PDF (OPTIMIZED) ---------- */
 async function downloadDashboardSection() {
+    const btn = document.getElementById("downloadBtn");
+    const btnText = document.getElementById("btnText");
     const area = document.getElementById("download-area");
     const dateValue = document.getElementById("datePicker").value;
     
-    // Show a small "Processing" toast or console log if needed
-    console.log("Generating PDF...");
+    // 1. UI LOADER: Disable button and show loading state
+    btn.disabled = true;
+    const originalText = btnText.innerText;
+    btnText.innerHTML = `<span class="spinner"></span> Generating...`; 
+    // Note: Add a simple CSS spinner class for the "Attractive" look
 
     try {
-        // 1. Capture the dashboard as a high-res canvas
+        // 2. SPEED OPTIMIZATION: 
+        // We use scale: 1.5 instead of 2.0 to significantly speed up processing 
+        // while maintaining professional readability.
         const canvas = await html2canvas(area, { 
-            scale: 2, // Keeps text sharp
+            scale: 1.5, 
             useCORS: true,
-            logging: false
+            logging: false,
+            allowTaint: false,
+            imageTimeout: 0 // Prevents waiting too long for images
         });
 
-        const imgData = canvas.toDataURL("image/png");
+        const imgData = canvas.toDataURL("image/jpeg", 0.75); // Using JPEG at 75% quality is much faster/smaller than PNG
         
-        // 2. Initialize jsPDF (Orientation: Portrait, Unit: mm, Format: A4)
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF("p", "mm", "a4");
 
-        // 3. Calculate Dimensions to fit A4 paper
         const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        
-        const margin = 10; // 10mm margins
+        const margin = 10;
         const maxLineWidth = pageWidth - (margin * 2);
         
         const imgProps = pdf.getImageProperties(imgData);
         const ratio = imgProps.height / imgProps.width;
         const imgHeight = maxLineWidth * ratio;
 
-        // 4. Add Header Text to PDF
-        pdf.setFontSize(16);
+        // 3. PROFESSIONAL HEADER
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(18);
         pdf.setTextColor(26, 115, 232); // Google Blue
-        pdf.text("Solar Data Report", margin, 15);
+        pdf.text("SOLAR PERFORMANCE REPORT", margin, 15);
         
+        pdf.setFont("helvetica", "normal");
         pdf.setFontSize(10);
-        pdf.setTextColor(100);
-        pdf.text(`Generated Date: ${new Date().toLocaleString()}`, margin, 22);
-        pdf.text(`Data for: ${dateValue}`, margin, 27);
+        pdf.setTextColor(80);
+        pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 22);
+        pdf.text(`Report Date: ${dateValue}`, margin, 27);
 
-        // 5. Add the Dashboard Image
-        // Parameters: x, y, width, height
-        pdf.addImage(imgData, 'PNG', margin, 35, maxLineWidth, imgHeight);
+        // 4. DYNAMIC SCALING (Fits to A4)
+        pdf.addImage(imgData, 'JPEG', margin, 35, maxLineWidth, imgHeight);
 
-        // 6. Save the file
         pdf.save(`solar-report-${dateValue}.pdf`);
 
     } catch (error) {
-        console.error("PDF Generation failed:", error);
-        alert("Sorry, could not generate PDF. Check console for details.");
+        console.error("PDF Error:", error);
+        alert("Download failed.");
+    } finally {
+        // 5. RESET UI: Re-enable button
+        btn.disabled = false;
+        btnText.innerText = originalText;
     }
 }
 
