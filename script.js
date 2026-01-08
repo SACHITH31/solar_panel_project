@@ -178,56 +178,65 @@ function drawChart(data) {
 
 /* ---------- MONTH VIEW LOGIC (BUG FIXED) ---------- */
 async function fetchMonthlyMaxWatts(month, year) {
-  const today = new Date();
-  const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
-  const maxDay = isCurrentMonth ? today.getDate() : new Date(year, month, 0).getDate();
+    const today = new Date();
+    const isCurrentMonth = today.getMonth() + 1 === month && today.getFullYear() === year;
+    const maxDay = isCurrentMonth ? today.getDate() : new Date(year, month, 0).getDate();
 
-  const requests = [];
+    console.log(`--- Starting Fetch for ${month}/${year} (Targeting up to day ${maxDay}) ---`);
 
-  for (let d = 1; d <= maxDay; d++) {
-    const dayStr = String(d).padStart(2, "0");
-    const monthStr = String(month).padStart(2, "0");
-    const dateStr = `${year}-${monthStr}-${dayStr}`;
-    const sheetName = SHEET_PREFIX + dateStr;
+    const requests = [];
 
-    requests.push(
-      new Promise((resolve) => {
-        const queryUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`;
-        const query = new google.visualization.Query(queryUrl);
-        query.setQuery("SELECT B WHERE B IS NOT NULL");
-        
-        query.send((res) => {
-          if (res.isError()) return resolve(null); // Skips if sheet doesn't exist
+    for (let d = 1; d <= maxDay; d++) {
+        const dayStr = String(d).padStart(2, "0");
+        const monthStr = String(month).padStart(2, "0");
+        const dateStr = `${year}-${monthStr}-${dayStr}`;
+        const sheetName = SHEET_PREFIX + dateStr;
 
-          const dataTable = res.getDataTable();
-          if (!dataTable || dataTable.getNumberOfRows() === 0) return resolve(null);
+        requests.push(
+            new Promise((resolve) => {
+                const queryUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`;
+                const query = new google.visualization.Query(queryUrl);
+                query.setQuery("SELECT B WHERE B IS NOT NULL");
+                
+                query.send((res) => {
+                    if (res.isError()) {
+                        console.warn(`❌ No sheet found for: ${dateStr}`);
+                        return resolve(null);
+                    }
 
-          let dailyMax = 0;
-          let hasValues = false;
+                    const dataTable = res.getDataTable();
+                    if (!dataTable || dataTable.getNumberOfRows() === 0) {
+                        console.warn(`⚠️ Sheet exists but is empty for: ${dateStr}`);
+                        return resolve(null);
+                    }
 
-          for (let i = 0; i < dataTable.getNumberOfRows(); i++) {
-            const val = dataTable.getValue(i, 0);
-            if (typeof val === "number" && val > 0) {
-              if (val > dailyMax) dailyMax = val;
-              hasValues = true;
-            }
-          }
+                    let dailyMax = 0;
+                    for (let i = 0; i < dataTable.getNumberOfRows(); i++) {
+                        const val = dataTable.getValue(i, 0);
+                        if (typeof val === "number" && val > dailyMax) {
+                            dailyMax = val;
+                        }
+                    }
 
-          if (hasValues && dailyMax > 0) {
-            resolve({
-              label: `${d} ${new Date(year, month - 1, d).toLocaleString("en", { month: "short" })}`,
-              value: dailyMax
-            });
-          } else {
-            resolve(null);
-          }
-        });
-      })
-    );
-  }
+                    if (dailyMax > 0) {
+                        console.log(`✅ Data Found for ${dateStr}: Peak ${dailyMax} Watts`);
+                        resolve({
+                            label: `${d} ${new Date(year, month - 1, d).toLocaleString("en", { month: "short" })}`,
+                            value: dailyMax
+                        });
+                    } else {
+                        resolve(null);
+                    }
+                });
+            })
+        );
+    }
 
-  const resolved = await Promise.all(requests);
-  return resolved.filter(day => day !== null); // STOPS FLAT BARS BUG
+    const resolved = await Promise.all(requests);
+    const filteredData = resolved.filter(day => day !== null);
+    
+    console.log(`--- Fetch Complete. Found ${filteredData.length} days with data. ---`);
+    return filteredData;
 }
 
 function drawMonthlyMaxBarChart(dataArr, month, year) {
