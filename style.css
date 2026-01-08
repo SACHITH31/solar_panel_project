@@ -671,8 +671,8 @@ option {
 }
 
 #monthlyBarChartContainer {
-    width: 100% !important;
-    max-width: 100%;
-    overflow: hidden; /* Added for extra safety */
-    margin-top: 20px;
+  width: 100% !important;
+  max-width: 100%;
+  overflow: hidden; /* Added for extra safety */
+  margin-top: 20px;
 }
