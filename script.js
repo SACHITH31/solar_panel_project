@@ -249,27 +249,30 @@ function drawMonthlyMaxBarChart(dataArr, month, year) {
     const options = {
   title: `Daily Peak Power Generation - ${month}/${year}`,
   legend: "none",
-  height: 500, // Increased height
+  height: 500,
+  // Adjust these percentages to bring the graph inward
   chartArea: { 
-    left: 60, 
-    right: 20, 
-    top: 50, 
-    bottom: 100, // Space for rotated dates
-    width: '90%', // Uses more of the container width
-    height: '70%' 
+    left: '10%',   // Gives more room for the Y-axis numbers
+    right: '10%',  // FIX: Prevents the "8 Jan" bar from hitting the right edge
+    top: '15%',    // Room for the title
+    bottom: '20%', // Room for rotated date labels
+    width: '80%',  // Restricts total width to 80% of container
+    height: '65%' 
   },
   hAxis: { 
     title: "Date", 
     slantedText: true, 
     slantedTextAngle: 45,
-    textStyle: { fontSize: 12 } 
+    textStyle: { fontSize: 11 } 
   },
   vAxis: { 
     title: "Watts", 
     minValue: 0,
-    gridlines: { count: 6 }
+    gridlines: { count: 6 },
+    // This helps format large numbers so they don't take up too much horizontal space
+    format: 'short' 
   },
-  bar: { groupWidth: "80%" }, // Makes bars wider
+  bar: { groupWidth: "75%" }, 
   colors: ["#1a73e8"]
 };
 

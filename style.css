@@ -506,7 +506,6 @@ div#custom_legend {
   border-radius: 12px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   display: flex;
-  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -539,7 +538,6 @@ div#custom_legend {
 .month-popup {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 20px;
 }
 
@@ -551,6 +549,8 @@ div#custom_legend {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-bottom: 20px;
+  margin-left: 10px;
 }
 
 #monthlyBarChartContainer {
@@ -662,10 +662,17 @@ option {
   max-width: 1000px;
   display: flex;
   flex-direction: column; /* Forces vertical stacking */
-  align-items: center;
+  /* align-items: center; */
 }
 
 .month-controls {
   display: flex;
   flex-direction: column;
+}
+
+#monthlyBarChartContainer {
+    width: 100% !important;
+    max-width: 100%;
+    overflow: hidden; /* Added for extra safety */
+    margin-top: 20px;
 }
