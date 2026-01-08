@@ -247,28 +247,31 @@ function drawMonthlyMaxBarChart(dataArr, month, year) {
     dt.addRows(rows);
 
     const options = {
-        title: `Daily Peak Power Generation - ${month}/${year}`,
-        legend: "none",
-        height: 450,
-        chartArea: { left: 80, right: 30, top: 60, bottom: 80 },
-        hAxis: { 
-            title: "Date", 
-            slantedText: true, 
-            slantedTextAngle: 45 
-        },
-        vAxis: { 
-            title: "Watts", 
-            minValue: 0,
-            gridlines: { count: 6 }
-        },
-        bar: { groupWidth: "75%" },
-        colors: ["#1a73e8"],
-        animation: {
-            startup: true,
-            duration: 1000,
-            easing: 'out',
-        }
-    };
+  title: `Daily Peak Power Generation - ${month}/${year}`,
+  legend: "none",
+  height: 500, // Increased height
+  chartArea: { 
+    left: 60, 
+    right: 20, 
+    top: 50, 
+    bottom: 100, // Space for rotated dates
+    width: '90%', // Uses more of the container width
+    height: '70%' 
+  },
+  hAxis: { 
+    title: "Date", 
+    slantedText: true, 
+    slantedTextAngle: 45,
+    textStyle: { fontSize: 12 } 
+  },
+  vAxis: { 
+    title: "Watts", 
+    minValue: 0,
+    gridlines: { count: 6 }
+  },
+  bar: { groupWidth: "80%" }, // Makes bars wider
+  colors: ["#1a73e8"]
+};
 
     const chart = new google.visualization.ColumnChart(chartDiv);
     chart.draw(dt, options);

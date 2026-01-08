@@ -634,3 +634,38 @@ option {
   padding: 15px;
   border-radius: 8px;
 }
+/* Keeps buttons together in a line */
+.month-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  width: 100%;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eee; /* Optional: adds a nice separator */
+}
+
+/* Ensures the chart container is wide and visible */
+#monthlyBarChartContainer {
+  width: 100% !important;
+  min-height: 500px;
+}
+
+#monthlyBarChart {
+  width: 100% !important;
+  height: 500px !important;
+}
+
+/* Makes the popup wider to accommodate a big graph */
+.month-popup-content {
+  width: 90%;
+  max-width: 1000px;
+  display: flex;
+  flex-direction: column; /* Forces vertical stacking */
+  align-items: center;
+}
+
+.month-controls {
+  display: flex;
+  flex-direction: column;
+}
