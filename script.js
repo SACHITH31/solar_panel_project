@@ -233,11 +233,11 @@ async function handleMonthViewRequest() {
   loader.style.display = "none";
 
   if (results.length === 0) {
-    alert(
-      `No solar data recorded for ${
-        document.getElementById("mvMonth").options[month - 1].text
-      } ${year}.`
-    );
+    // alert(
+    //   `No solar data recorded for ${
+    //     document.getElementById("mvMonth").options[month - 1].text
+    //   } ${year}.`
+    // );
     if (oopsMsg) oopsMsg.style.display = "block";
     return;
   }
