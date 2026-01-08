@@ -575,43 +575,62 @@ div#custom_legend {
   height: 450px;
 }
 .spinner {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border: 2px solid rgba(255,255,255,.3);
-    border-radius: 50%;
-    border-top-color: #fff;
-    animation: spin 1s ease-in-out infinite;
-    margin-right: 8px;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 button:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .event-card {
-    margin-top: 20px;
-    padding: 20px;
-    border-radius: 8px;
-    transition: all 0.3s ease; /* Smooth color transition when changing dates */
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 8px;
+  transition: all 0.3s ease; /* Smooth color transition when changing dates */
 }
 
 /* Ensure the inner message doesn't have its own separate background */
 #event-message {
-    background: transparent !important;
+  background: transparent !important;
 }
 .close-popup {
   cursor: pointer;
 }
-#mvMonth, #mvYear, option {
+#mvMonth,
+#mvYear,
+option {
   cursor: pointer;
 }
 option {
   cursor: pointer;
 }
 
+.close-popup-top {
+  position: fixed;
+  top: 20px;
+  right: 30px;
+  font-size: 50px;
+  color: #ff4d4d; /* Red color */
+  cursor: pointer;
+  z-index: 3000;
+}
+
+#monthlyBarChartContainer {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+}

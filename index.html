@@ -10,6 +10,7 @@
     <script src="https://www.gstatic.com/charts/loader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
     <div class="dashboard-container">
@@ -63,13 +64,12 @@
         </div> -->
       </section>
       <div id="monthViewPopup" class="month-popup" style="display: none">
-        <!-- Controls -->
-        <div class="closeContainer">
-          <span class="close-popup" onclick="closeMonthPopup()">&times;</span>
-        </div>
-        <div class="month-popup-content">
-          <label>Month:</label>
-          <select id="mvMonth">
+    <div class="closeContainer">
+        <span class="close-popup" onclick="closeMonthPopup()">&times;</span>
+    </div>
+    <div class="month-popup-content">
+        <label>Month:</label>
+        <select id="mvMonth">
             <option value="1">January</option>
             <option value="2">February</option>
             <option value="3">March</option>
@@ -82,27 +82,26 @@
             <option value="10">October</option>
             <option value="11">November</option>
             <option value="12">December</option>
-          </select>
+        </select>
 
-          <label>Year:</label>
-          <select id="mvYear"></select>
+        <label>Year:</label>
+        <select id="mvYear"></select>
 
-          <button id="mvOkBtn" class="okButton">OK</button>
+        <button id="mvOkBtn" class="okButton">OK</button>
+
+        <div id="oopsMessage" style="display: none; color: #b91c1c; background: #fef2f2; padding: 8px; border-radius: 5px; margin-top: 10px; border: 1px solid #fecaca; text-align: center; font-weight: bold;">
+            ⚠️ Oops! No data available for this selected month.
         </div>
-        <div
-          id="monthLoader"
-          style="display: none; text-align: center; margin: 20px 0"
-        >
-          <span>Loading monthly data...</span>
+
+        <div id="monthLoader" style="display: none; text-align: center; margin: 20px 0">
+            <span>Loading monthly data...</span>
         </div>
-        <div id="monthlyBarChartContainer" style="display: none">
-          <div id="monthlyBarChart"></div>
+
+        <div id="monthlyBarChartContainer" style="display: none; margin-top: 20px;">
+            <div id="monthlyBarChart" style="width: 100%; height: 450px;"></div>
         </div>
-        <!-- Chart BELOW controls -->
-        <div id="monthlyBarChartContainer" style="display: none">
-          <div id="monthlyBarChart"></div>
-        </div>
-      </div>
+    </div>
+</div>
       <!-- Main Chart -->
       <div id="download-area">
         <section class="chart-card">
@@ -146,7 +145,7 @@
       <!-- Events -->
       <section id="events" class="event-card">
         <div id="event-message">No error detections occurred.</div>
-      </section> 
+      </section>
     </div>
 
     <script src="script.js"></script>

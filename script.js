@@ -1,3 +1,5 @@
+
+
 google.charts.load("current", { packages: ["corechart"] });
 
 const SPREADSHEET_ID = "1AdBjvpwcuAPetNtZXWR1nWwQTdbLCpslQ6xWbcPr5M0";
@@ -43,29 +45,7 @@ function init() {
     document.getElementById("monthViewPopup").style.display = "flex";
   });
 
-  document.getElementById("mvOkBtn").addEventListener("click", async () => {
-    const loader = document.getElementById("monthLoader");
-    const chartContainer = document.getElementById("monthlyBarChartContainer");
-    const chartDiv = document.getElementById("monthlyBarChart");
-
-    loader.style.display = "block";
-    chartContainer.style.display = "none";
-    chartDiv.innerHTML = ""; 
-
-    const month = parseInt(document.getElementById("mvMonth").value);
-    const year = parseInt(document.getElementById("mvYear").value);
-
-    const data = await fetchMonthlyMaxWatts(month, year);
-
-    loader.style.display = "none";
-
-    if (!data || data.length === 0) {
-      alert(`No solar data recorded for ${document.getElementById("mvMonth").options[month-1].text} ${year}.`);
-      return;
-    }
-
-    drawMonthlyMaxBarChart(data, month, year);
-  });
+  document.getElementById("mvOkBtn").addEventListener("click", handleMonthViewRequest);
 }
 
 /* ---------- DATE HANDLING ---------- */
@@ -104,7 +84,7 @@ function loadData(dateValue) {
     `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`
   );
   query.setQuery(`SELECT A, B, F, J, N, V, Z, AA, AB WHERE A IS NOT NULL AND B IS NOT NULL`);
-  
+
   query.send((response) => {
     hideLoading();
     if (response.isError()) {
@@ -132,10 +112,13 @@ function loadData(dateValue) {
   });
 }
 
-/* ---------- CHART ---------- */
+/* ---------- CHART (FIXED ANNOTATIONS) ---------- */
 function drawChart(data) {
-  let cols = data.getNumberOfColumns();
-  if (cols === 9) {
+  // Ensure we don't duplicate columns if redrawing
+  let view = new google.visualization.DataView(data);
+  
+  // Logic to add annotation columns to the underlying data if they don't exist
+  if (data.getNumberOfColumns() < 11) {
     data.addColumn({ type: "string", role: "annotation" });
     data.addColumn({ type: "string", role: "annotationText" });
   }
@@ -151,15 +134,16 @@ function drawChart(data) {
     if (lastPower && lastPower - power > DROP_THRESHOLD) {
       data.setValue(i, annotationCol, "⚠");
       data.setValue(i, annotationTextCol, "Sudden Power Drop");
+    } else {
+      data.setValue(i, annotationCol, null);
+      data.setValue(i, annotationTextCol, null);
     }
     lastPower = power;
   }
 
-  const view = new google.visualization.DataView(data);
   view.setColumns([0, 1, annotationCol, annotationTextCol]);
 
   const chart = new google.visualization.LineChart(document.getElementById("chart_div"));
-
   chart.draw(view, {
     title: "SOLAR POWER GENERATION (Watts)",
     legend: "none",
@@ -176,103 +160,126 @@ function drawChart(data) {
   });
 }
 
-/* ---------- MONTH VIEW LOGIC (BUG FIXED) ---------- */
-async function fetchMonthlyMaxWatts(month, year) {
-    const today = new Date();
-    const isCurrentMonth = today.getMonth() + 1 === month && today.getFullYear() === year;
-    const maxDay = isCurrentMonth ? today.getDate() : new Date(year, month, 0).getDate();
+/* ---------- FAST MONTH VIEW (FIXED SPEED & GHOST DATA) ---------- */
+async function handleMonthViewRequest() {
+  const loader = document.getElementById("monthLoader");
+  const chartContainer = document.getElementById("monthlyBarChartContainer");
+  const chartDiv = document.getElementById("monthlyBarChart");
+  const oopsMsg = document.getElementById("oopsMessage");
 
-    console.log(`--- Starting Fetch for ${month}/${year} (Targeting up to day ${maxDay}) ---`);
+  if(oopsMsg) oopsMsg.style.display = "none";
+  loader.style.display = "block";
+  chartContainer.style.display = "none";
+  chartDiv.innerHTML = "";
 
-    const requests = [];
+  const month = parseInt(document.getElementById("mvMonth").value);
+  const year = parseInt(document.getElementById("mvYear").value);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const today = new Date();
+  const maxDay = (today.getMonth() + 1 === month && today.getFullYear() === year) ? today.getDate() : daysInMonth;
 
-    for (let d = 1; d <= maxDay; d++) {
-        const dayStr = String(d).padStart(2, "0");
-        const monthStr = String(month).padStart(2, "0");
-        const dateStr = `${year}-${monthStr}-${dayStr}`;
-        const sheetName = SHEET_PREFIX + dateStr;
+  const dayPromises = [];
 
-        requests.push(
-            new Promise((resolve) => {
-                const queryUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}`;
-                const query = new google.visualization.Query(queryUrl);
-                query.setQuery("SELECT B WHERE B IS NOT NULL");
-                
-                query.send((res) => {
-                    if (res.isError()) {
-                        console.warn(`❌ No sheet found for: ${dateStr}`);
-                        return resolve(null);
-                    }
+  for (let d = 1; d <= maxDay; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const sheetName = SHEET_PREFIX + dateStr;
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
 
-                    const dataTable = res.getDataTable();
-                    if (!dataTable || dataTable.getNumberOfRows() === 0) {
-                        console.warn(`⚠️ Sheet exists but is empty for: ${dateStr}`);
-                        return resolve(null);
-                    }
+    dayPromises.push(
+      fetch(url)
+        .then(res => res.text())
+        .then(text => {
+          // VALIDATION: If data doesn't contain the date, it's a redirect to Master. Skip it.
+          if (!text.includes(dateStr)) return null;
 
-                    let dailyMax = 0;
-                    for (let i = 0; i < dataTable.getNumberOfRows(); i++) {
-                        const val = dataTable.getValue(i, 0);
-                        if (typeof val === "number" && val > dailyMax) {
-                            dailyMax = val;
-                        }
-                    }
+          const rows = text.split("\n").slice(1);
+          let dailyMax = 0;
+          rows.forEach(row => {
+            const cols = row.split(",");
+            const val = parseFloat(cols[1]?.replace(/"/g, ''));
+            if (!isNaN(val) && val > dailyMax) dailyMax = val;
+          });
 
-                    if (dailyMax > 0) {
-                        console.log(`✅ Data Found for ${dateStr}: Peak ${dailyMax} Watts`);
-                        resolve({
-                            label: `${d} ${new Date(year, month - 1, d).toLocaleString("en", { month: "short" })}`,
-                            value: dailyMax
-                        });
-                    } else {
-                        resolve(null);
-                    }
-                });
-            })
-        );
-    }
+          return dailyMax > 0 ? {
+            label: `${d} ${new Date(year, month - 1).toLocaleString("en", { month: "short" })}`,
+            value: dailyMax,
+            dayNum: d
+          } : null;
+        })
+        .catch(() => null)
+    );
+  }
 
-    const resolved = await Promise.all(requests);
-    const filteredData = resolved.filter(day => day !== null);
-    
-    console.log(`--- Fetch Complete. Found ${filteredData.length} days with data. ---`);
-    return filteredData;
+  const results = (await Promise.all(dayPromises)).filter(r => r !== null).sort((a,b) => a.dayNum - b.dayNum);
+  loader.style.display = "none";
+
+  if (results.length === 0) {
+    alert(`No solar data recorded for ${document.getElementById("mvMonth").options[month - 1].text} ${year}.`);
+    if(oopsMsg) oopsMsg.style.display = "block";
+    return;
+  }
+
+  drawMonthlyMaxBarChart(results, month, year);
 }
 
 function drawMonthlyMaxBarChart(dataArr, month, year) {
-  const container = document.getElementById("monthlyBarChartContainer");
-  container.style.display = "block";
+    const container = document.getElementById("monthlyBarChartContainer");
+    const chartDiv = document.getElementById("monthlyBarChart");
+    const oopsMsg = document.getElementById("oopsMessage");
 
-  const dt = new google.visualization.DataTable();
-  dt.addColumn("string", "Date");
-  dt.addColumn("number", "Max Watts");
+    if (!dataArr || dataArr.length === 0) {
+        if(oopsMsg) oopsMsg.style.display = "block";
+        container.style.display = "none";
+        return;
+    }
 
-  dt.addRows(dataArr.map(d => [d.label, d.value]));
+    // Reveal the container
+    oopsMsg.style.display = "none";
+    container.style.display = "block";
 
-  const options = {
-    title: `Daily Peak Power Generation - ${month}/${year}`,
-    legend: "none",
-    height: 450,
-    chartArea: { left: 80, right: 30, top: 60, bottom: 80 },
-    hAxis: { title: "Date", slantedText: true, slantedTextAngle: 45 },
-    vAxis: { title: "Watts", minValue: 0, gridlines: { count: 6 } },
-    bar: { groupWidth: "70%" },
-    colors: ['#1a73e8']
-  };
+    // Create the DataTable manually from the array objects {label, value}
+    const dt = new google.visualization.DataTable();
+    dt.addColumn("string", "Date");
+    dt.addColumn("number", "Peak Watts");
 
-  const chart = new google.visualization.ColumnChart(document.getElementById("monthlyBarChart"));
-  chart.draw(dt, options);
+    // Convert the dataArr into rows Google can read
+    const rows = dataArr.map(item => [item.label, item.value]);
+    dt.addRows(rows);
+
+    const options = {
+        title: `Daily Peak Power Generation - ${month}/${year}`,
+        legend: "none",
+        height: 450,
+        chartArea: { left: 80, right: 30, top: 60, bottom: 80 },
+        hAxis: { 
+            title: "Date", 
+            slantedText: true, 
+            slantedTextAngle: 45 
+        },
+        vAxis: { 
+            title: "Watts", 
+            minValue: 0,
+            gridlines: { count: 6 }
+        },
+        bar: { groupWidth: "75%" },
+        colors: ["#1a73e8"],
+        animation: {
+            startup: true,
+            duration: 1000,
+            easing: 'out',
+        }
+    };
+
+    const chart = new google.visualization.ColumnChart(chartDiv);
+    chart.draw(dt, options);
 }
 
 function populateMonthViewYears() {
   const yearSelect = document.getElementById("mvYear");
   yearSelect.innerHTML = "";
-  const startYear = 2025;
-  const endYear = new Date().getFullYear();
-  for (let y = startYear; y <= endYear; y++) {
+  for (let y = 2025; y <= new Date().getFullYear(); y++) {
     const opt = document.createElement("option");
-    opt.value = y;
-    opt.textContent = y;
+    opt.value = y; opt.textContent = y;
     yearSelect.appendChild(opt);
   }
 }
@@ -293,38 +300,23 @@ function showTotalPower(data) {
 }
 
 function showCO2Saved(totalKwh) {
-  const co2 = totalKwh * 0.82;
-  document.getElementById("co2_saved").innerHTML = `🌱 CO₂ Saved : <strong>${co2.toFixed(0)} kg</strong>`;
+  document.getElementById("co2_saved").innerHTML = `🌱 CO₂ Saved : <strong>${(totalKwh * 0.82).toFixed(0)} kg</strong>`;
 }
 
 function updateInverterHealth(data) {
   const healthEl = document.getElementById("inverter-health");
   const rowCount = data.getNumberOfRows();
-  
-  // If there's only one row, we can't compare yet
-  if (rowCount < 2) {
-    healthEl.innerHTML = `🟢 Inverter Health : <strong>100%</strong>`;
-    return;
-  }
+  if (rowCount < 2) { healthEl.innerHTML = `🟢 Inverter Health : <strong>100%</strong>`; return; }
 
-  // Get the two most recent power readings (Column 1 is Watts)
   const currentPower = data.getValue(rowCount - 1, 1);
   const previousPower = data.getValue(rowCount - 2, 1);
 
-  // Logic: Only calculate health if there is a drop
   if (currentPower < previousPower && previousPower > 0) {
-    // Calculate how much it dropped as a percentage
-    const dropAmount = previousPower - currentPower;
-    const dropPercentage = (dropAmount / previousPower) * 100;
+    const dropPercentage = ((previousPower - currentPower) / previousPower) * 100;
     const healthScore = (100 - dropPercentage).toFixed(1);
-
-    // If the drop is huge (e.g., more than 50%), let's make it Red
-    const color = healthScore < 50 ? "#dc2626" : "#f59e0b"; // Red or Orange
-    const statusDot = healthScore < 50 ? "🔴" : "🟡";
-
-    healthEl.innerHTML = `${statusDot} Inverter Health : <strong style="color:${color}">${healthScore}%</strong> <small>(Drop: -${dropPercentage.toFixed(1)}%)</small>`;
+    const color = healthScore < 50 ? "#dc2626" : "#f59e0b";
+    healthEl.innerHTML = `🟡 Health : <strong style="color:${color}">${healthScore}%</strong> <small>(-${dropPercentage.toFixed(1)}%)</small>`;
   } else {
-    // If power is steady or increasing, health is perfect
     healthEl.innerHTML = `🟢 Inverter Health : <strong>100%</strong>`;
   }
 }
@@ -349,35 +341,24 @@ function getLastNonNullInColumn(data, col) {
 
 /* ---------- UI HELPERS ---------- */
 function showLoading() {
-  let loader = document.getElementById("loader");
-  if (!loader) {
-    loader = document.createElement("div");
-    loader.id = "loader";
-    loader.style.textAlign = "center";
+  if (!document.getElementById("loader")) {
+    const loader = document.createElement("div");
+    loader.id = "loader"; loader.style.textAlign = "center";
     document.querySelector(".chart-card").prepend(loader);
   }
 }
 
-function hideLoading() {
-  const loader = document.getElementById("loader");
-  if (loader) loader.remove();
-}
+function hideLoading() { const l = document.getElementById("loader"); if (l) l.remove(); }
 
 function showError(msg) {
-  let banner = document.getElementById("error-banner");
-  if (!banner) {
-    banner = document.createElement("div");
-    banner.id = "error-banner";
-    banner.style.cssText = "background:#ffe5e5;color:#b00020;padding:12px;border-radius:8px;font-weight:600;margin-bottom:10px";
-    document.querySelector(".dashboard-container").prepend(banner);
-  }
+  let banner = document.getElementById("error-banner") || document.createElement("div");
+  banner.id = "error-banner";
+  banner.style.cssText = "background:#ffe5e5;color:#b00020;padding:12px;border-radius:8px;font-weight:600;margin-bottom:10px";
   banner.innerText = msg;
+  if(!document.getElementById("error-banner")) document.querySelector(".dashboard-container").prepend(banner);
 }
 
-function clearError() {
-  const banner = document.getElementById("error-banner");
-  if (banner) banner.remove();
-}
+function clearError() { const b = document.getElementById("error-banner"); if (b) b.remove(); }
 
 function clearUI() {
   document.getElementById("chart_div").innerHTML = "";
@@ -391,26 +372,21 @@ function startPolling(date) {
   pollingTimer = setInterval(() => loadData(date), POLLING_INTERVAL);
 }
 
-function stopPolling() {
-  if (pollingTimer) {
-    clearInterval(pollingTimer);
-    pollingTimer = null;
-  }
-}
+function stopPolling() { if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; } }
 
 function setLiveStatus() {
-  const statusEl = document.getElementById("status");
-  if(statusEl) statusEl.innerHTML = `<span class="live-dot"></span><span>LIVE (auto-updating every 2 minutes)</span>`;
+  const el = document.getElementById("status");
+  if (el) el.innerHTML = `<span class="live-dot"></span><span>LIVE (auto-updating every 2 minutes)</span>`;
 }
 
 function setHistoricalStatus() {
-  const statusEl = document.getElementById("status");
-  if(statusEl) statusEl.innerHTML = `<span>📅 Historical Data</span>`;
+  const el = document.getElementById("status");
+  if (el) el.innerHTML = `<span>📅 Historical Data</span>`;
 }
 
 function updateLastUpdatedTime() {
-  const lastUpdEl = document.getElementById("last_updated");
-  if(lastUpdEl) lastUpdEl.innerHTML = `Last updated at: <strong>${new Date().toLocaleTimeString()}</strong>`;
+  const el = document.getElementById("last_updated");
+  if (el) el.innerHTML = `Last updated at: <strong>${new Date().toLocaleTimeString()}</strong>`;
 }
 
 /* ---------- EVENT DETECTION ---------- */
@@ -419,202 +395,95 @@ function detectPowerEvents(data) {
   const DROP_THRESHOLD = 15000;
   for (let i = 0; i < data.getNumberOfRows(); i++) {
     const p = data.getValue(i, 1);
-    const t = data.getValue(i, 0);
-    if (last && last - p > DROP_THRESHOLD) detectedEventSet.add(`${t} - Sudden Drop`);
+    if (last && last - p > DROP_THRESHOLD) detectedEventSet.add(`${data.getValue(i, 0)} - Sudden Drop`);
     last = p;
   }
   displayEvents();
 }
 
-/* ---------- POPUP CONTROL ---------- */
-/* ---------- POPUP CONTROL ---------- */
-// function displayEvents() {
-//     const el = document.getElementById("events");
-//     el.innerHTML = ""; // Clear current messages
-
-//     if (detectedEventSet.size === 0) {
-//         // meaningful message if no errors occurred
-//         el.innerHTML = `
-//             <div style="text-align: center; padding: 20px; color: #059669; background: #ecfdf5; border-radius: 8px; border: 1px solid #10b981;">
-//                 <i class="fas fa-check-circle"></i> No error detections or sudden power drops occurred for this day.
-//             </div>`;
-//     } else {
-//         // Display actual errors found in detectedEventSet
-//         const ul = document.createElement("ul");
-//         ul.className = "event-list";
-//         detectedEventSet.forEach((e) => {
-//             const li = document.createElement("li");
-//             li.style.color = "#b91c1c";
-//             li.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${e}`;
-//             ul.appendChild(li);
-//         });
-//         el.appendChild(ul);
-//     }
-// }
-
 function displayEvents() {
-    const eventsSection = document.getElementById("events");
-    const messageContainer = document.getElementById("event-message");
-    
-    // Clear the container first
-    messageContainer.innerHTML = "";
+  const eventsSection = document.getElementById("events");
+  const messageContainer = document.getElementById("event-message");
+  messageContainer.innerHTML = "";
 
-    // 1. CHECK IF THERE ARE NO ERRORS
-    if (!detectedEventSet || detectedEventSet.size === 0) {
-        // Change the WHOLE section to green and remove red borders
-        eventsSection.style.backgroundColor = "#ecfdf5"; // Success light green
-        eventsSection.style.border = "1px solid #10b981"; // Strong green border
-        eventsSection.style.boxShadow = "none";
-        
-        messageContainer.innerHTML = `
-            <div style="color: #065f46; font-weight: 500; text-align: center; padding: 10px;">
-                <i class="fas fa-check-circle"></i> No error detections or sudden power drops occurred for this day.
-            </div>`;
-    } 
-    // 2. IF ERRORS EXIST
-    else {
-        // Change the WHOLE section to red
-        eventsSection.style.backgroundColor = "#fef2f2"; // Error light red
-        eventsSection.style.border = "1px solid #ef4444"; // Strong red border
-        
-        const title = document.createElement("h4");
-        title.style.color = "#b91c1c";
-        title.style.marginBottom = "10px";
-        title.innerText = "System Alerts Detected:";
-        messageContainer.appendChild(title);
-
-        const ul = document.createElement("ul");
-        ul.style.margin = "0";
-        ul.style.paddingLeft = "20px";
-        detectedEventSet.forEach(event => {
-            const li = document.createElement("li");
-            li.style.color = "#b91c1c";
-            li.style.marginBottom = "5px";
-            li.innerText = event;
-            ul.appendChild(li);
-        });
-        messageContainer.appendChild(ul);
-    }
+  if (!detectedEventSet || detectedEventSet.size === 0) {
+    eventsSection.style.backgroundColor = "#ecfdf5";
+    eventsSection.style.border = "1px solid #10b981";
+    messageContainer.innerHTML = `<div style="color: #065f46; font-weight: 500; text-align: center; padding: 10px;">✅ No error detections occurred for this day.</div>`;
+  } else {
+    eventsSection.style.backgroundColor = "#fef2f2";
+    eventsSection.style.border = "1px solid #ef4444";
+    const title = document.createElement("h4");
+    title.style.color = "#b91c1c"; title.innerText = "System Alerts Detected:";
+    messageContainer.appendChild(title);
+    const ul = document.createElement("ul");
+    detectedEventSet.forEach((event) => {
+      const li = document.createElement("li");
+      li.style.color = "#b91c1c"; li.innerText = event;
+      ul.appendChild(li);
+    });
+    messageContainer.appendChild(ul);
+  }
 }
 
-// In your close function
-function closeMonthPopup() {
-    document.getElementById("monthViewPopup").style.display = "none";
-}
+function closeMonthPopup() { document.getElementById("monthViewPopup").style.display = "none"; }
 
-/* ---------- RESET ON DATE CHANGE ---------- */
-// Add this inside your onDateSelect() or loadData() function 
-// to ensure errors don't "carry over" to the next day
-function clearPreviousEvents() {
-    detectedEventSet.clear();
-    document.getElementById("events").innerHTML = "";
-}
-
-/* ---------- DOWNLOAD DASHBOARD AS PDF (OPTIMIZED) ---------- */
+/* ---------- PDF DOWNLOAD (FIXED) ---------- */
 async function downloadDashboardSection() {
-    const btn = document.getElementById("downloadBtn");
-    const btnText = document.getElementById("btnText");
-    const mainArea = document.getElementById("download-area");
-    const eventsArea = document.getElementById("events"); // The missing section
-    const dateValue = document.getElementById("datePicker").value;
-    
-    btn.disabled = true;
-    btnText.innerHTML = `<span class="spinner"></span> Capturing Full Report...`;
+  const btn = document.getElementById("downloadBtn");
+  const btnText = document.getElementById("btnText");
+  const mainArea = document.getElementById("download-area");
+  const eventsArea = document.getElementById("events");
+  const dateValue = document.getElementById("datePicker").value;
 
-    try {
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF("p", "mm", "a4");
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const margin = 10;
-        const maxLineWidth = pageWidth - (margin * 2);
+  btn.disabled = true;
+  btnText.innerHTML = `<span class="spinner"></span> Capturing Full Report...`;
 
-        // 1. CAPTURE MAIN DASHBOARD
-        const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
-        const imgMain = canvasMain.toDataURL("image/jpeg", 0.85);
-        const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 10;
+    const maxLineWidth = pageWidth - margin * 2;
 
-        // 2. CAPTURE EVENTS SECTION (The missing part)
-        const canvasEvents = await html2canvas(eventsArea, { scale: 2, useCORS: true });
-        const imgEvents = canvasEvents.toDataURL("image/jpeg", 0.85);
-        const eventsHeight = (maxLineWidth * canvasEvents.height) / canvasEvents.width;
+    const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
+    const imgMain = canvasMain.toDataURL("image/jpeg", 0.85);
+    const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
 
-        // 3. ADD HEADER
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(16);
-        pdf.setTextColor(26, 115, 232);
-        pdf.text("SOLAR PERFORMANCE & ERROR REPORT", margin, 15);
-        pdf.setFontSize(9);
-        pdf.setTextColor(100);
-        pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 21);
-        pdf.text(`Reported Date: ${dateValue}`, margin, 26);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.setTextColor(26, 115, 232);
+    pdf.text("SOLAR PERFORMANCE & ERROR REPORT", margin, 15);
+    pdf.setFontSize(9);
+    pdf.setTextColor(100);
+    pdf.text(`Generated On: ${new Date().toLocaleString()}`, margin, 22); 
+    pdf.text(`Reported Date: ${dateValue}`, margin, 27);
 
-        // 4. ADD MAIN DASHBOARD
-        pdf.addImage(imgMain, 'JPEG', margin, 28, maxLineWidth, mainHeight);
+    pdf.addImage(imgMain, "JPEG", margin, 28, maxLineWidth, mainHeight);
 
-        // 5. ADD EVENTS SECTION BELOW
-        // Position it right after the main dashboard
-        const eventsYPosition = 28 + mainHeight + 5; 
-        
-        // If it's too long for the first page, we add a new page
-        if (eventsYPosition + eventsHeight > 280) { 
-            pdf.addPage();
-            pdf.text("System Events & Errors (Continued)", margin, 15);
-            pdf.addImage(imgEvents, 'JPEG', margin, 25, maxLineWidth, eventsHeight);
-        } else {
-            pdf.addImage(imgEvents, 'JPEG', margin, eventsYPosition, maxLineWidth, eventsHeight);
-        }
+    const canvasEvents = await html2canvas(eventsArea, { scale: 2, useCORS: true });
+    const imgEvents = canvasEvents.toDataURL("image/jpeg", 0.85);
+    const eventsHeight = (maxLineWidth * canvasEvents.height) / canvasEvents.width;
 
-        pdf.save(`Solar_Full_Report_${dateValue}.pdf`);
-
-    } catch (error) {
-        console.error("PDF Error:", error);
-        alert("Download failed. Check console for details.");
-    } finally {
-        btn.disabled = false;
-        btnText.innerText = "📝Download PDF";
+    if (28 + mainHeight + eventsHeight + 10 > 280) {
+      pdf.addPage();
+      pdf.addImage(imgEvents, "JPEG", margin, 20, maxLineWidth, eventsHeight);
+    } else {
+      pdf.addImage(imgEvents, "JPEG", margin, 28 + mainHeight + 5, maxLineWidth, eventsHeight);
     }
+
+    pdf.save(`Solar_Report_${dateValue}.pdf`);
+  } catch (error) {
+    console.error(error);
+    alert("PDF Error. Ensure html2canvas and jspdf libraries are loaded.");
+  } finally {
+    btn.disabled = false;
+    btnText.innerText = "📝Download PDF";
+  }
 }
+
 function getTodayDate() { return new Date().toISOString().split("T")[0]; }
-
-function isDateInRange(dateStr) {
-  const d = new Date(dateStr);
-  const min = new Date("2025-11-22");
-  const max = new Date(getTodayDate());
-  return d >= min && d <= max;
-}
-
-/**
- * Updates the events section based on detected data.
- * @param {Set|Array} detectedEvents - The set of detected error strings.
- */
-function updateEventsDisplay(detectedEvents) {
-    const eventContainer = document.getElementById("events");
-    const messageDiv = document.getElementById("event-message");
-
-    // 1. If there are no errors, show the "All Clear" message
-    if (!detectedEvents || detectedEvents.size === 0) {
-        eventContainer.style.backgroundColor = "#f0fdf4"; // Success Green
-        eventContainer.style.border = "1px solid #bbf7d0";
-        messageDiv.innerHTML = `
-            <div style="color: #166534; font-weight: 500; text-align: center;">
-                ✅ No error detections or sudden power drops occurred for this day.
-            </div>`;
-    } 
-    // 2. If errors exist, show them in the red alert style
-    else {
-        eventContainer.style.backgroundColor = "#fef2f2"; // Error Red
-        eventContainer.style.border = "1px solid #fee2e2";
-        
-        let errorList = `<h4 style="color: #991b1b; margin-bottom: 8px;">System Events Detected:</h4><ul>`;
-        detectedEvents.forEach(err => {
-            errorList += `<li style="color: #b91c1c; margin-bottom: 4px;">${err}</li>`;
-        });
-        errorList += `</ul>`;
-        messageDiv.innerHTML = errorList;
-    }
-}
-
-// Call this inside your onDateSelect() to reset UI before loading new data
-function resetDashboardUI() {
-    document.getElementById("event-message").innerText = "Analyzing system data...";
+function isDateInRange(dStr) {
+  const d = new Date(dStr);
+  return d >= new Date("2025-11-22") && d <= new Date(getTodayDate());
 }
