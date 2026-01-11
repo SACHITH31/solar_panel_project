@@ -562,13 +562,13 @@ async function downloadDashboardSection() {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("p", "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight(); // Get height for footer placement
+    const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
 
     const isMonthlyActive = monthlyContainer && monthlyContainer.style.display !== "none";
 
-    // --- PAGE 1 LOGIC ---
+    // --- PAGE 1: DAILY DASHBOARD ---
     if (!isMonthlyActive) {
       const eventsClone = eventsArea.cloneNode(true);
       eventsClone.style.marginTop = "20px";
@@ -580,47 +580,75 @@ async function downloadDashboardSection() {
       addPdfHeader(pdf, dateValue, margin);
       const imgHeight = (maxLineWidth * canvas.height) / canvas.width;
       pdf.addImage(canvas.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, imgHeight);
-    } else {
+    } 
+    else {
+      // --- PAGE 1: CURRENT VIEW ---
       const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
       addPdfHeader(pdf, dateValue, margin);
       const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
       pdf.addImage(canvasMain.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, mainHeight);
 
-      // --- PAGE 2 LOGIC (Bar Graph + Errors) ---
+      // --- PAGE 2: MONTHLY OVERVIEW (Both Graphs) ---
       const tempDiv = document.createElement("div");
-      tempDiv.style.cssText = "background:#fff; padding:20px; width:1000px; position:absolute; left:-9999px;";
+      // Fixed width for high-quality capture
+      tempDiv.style.cssText = "background:#fff; padding:30px; width:1000px; position:absolute; left:-9999px;";
       document.body.appendChild(tempDiv);
 
       const heading = document.createElement("div");
-      heading.style.cssText = "font-size:22px; font-weight:bold; color:#1a73e8; margin-bottom:15px;";
-      heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} Overview`;
+      heading.style.cssText = "font-size:26px; font-weight:bold; color:#1a73e8; margin-bottom:20px; text-align:center; border-bottom:2px solid #eee; padding-bottom:10px;";
+      heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} Monthly Report`;
       tempDiv.appendChild(heading);
 
-      const chartClone = document.getElementById("monthlyBarChart").cloneNode(true);
-      chartClone.style.width = "100%";
-      tempDiv.appendChild(chartClone);
+      // 1. Add Peak Power Chart Clone
+      const powerLabel = document.createElement("h3");
+      powerLabel.innerText = "1. Daily Peak Power Generation (Watts)";
+      tempDiv.appendChild(powerLabel);
+      const chart1Clone = document.getElementById("monthlyBarChart").cloneNode(true);
+      chart1Clone.style.width = "100%";
+      tempDiv.appendChild(chart1Clone);
 
+      // 2. Add Energy Units Chart Clone
+      const energyLabel = document.createElement("h3");
+      energyLabel.style.marginTop = "30px";
+      energyLabel.innerText = "2. Daily Total Energy (Units / kWh)";
+      tempDiv.appendChild(energyLabel);
+      const chart2Clone = document.getElementById("monthlyEnergyChart").cloneNode(true);
+      chart2Clone.style.width = "100%";
+      tempDiv.appendChild(chart2Clone);
+
+      // 3. Add Formula/Info Note
+      const infoNote = document.createElement("div");
+      infoNote.style.cssText = "margin-top:10px; font-style:italic; color:#666; font-size:14px;";
+      infoNote.innerText = "Note: Energy Units calculated as (Last Value - First Value) / 1000";
+      tempDiv.appendChild(infoNote);
+
+      // 4. Add System Alerts
+      const alertsLabel = document.createElement("h3");
+      alertsLabel.style.marginTop = "30px";
+      alertsLabel.innerText = "3. System Performance Alerts";
+      tempDiv.appendChild(alertsLabel);
       const eventsClone = eventsArea.cloneNode(true);
-      eventsClone.style.marginTop = "30px";
       tempDiv.appendChild(eventsClone);
 
-      await new Promise(r => setTimeout(r, 500));
+      // Render to PDF
+      await new Promise(r => setTimeout(r, 600)); // Buffer for rendering
       const canvasMonthly = await html2canvas(tempDiv, { scale: 2, useCORS: true });
       const monthlyHeight = (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
 
       pdf.addPage();
-      pdf.addImage(canvasMonthly.toDataURL("image/jpeg", 0.85), "JPEG", margin, 20, maxLineWidth, monthlyHeight);
+      // If content is too long for one page, we scale it to fit A4
+      const finalHeight = monthlyHeight > (pageHeight - 40) ? (pageHeight - 40) : monthlyHeight;
+      pdf.addImage(canvasMonthly.toDataURL("image/jpeg", 0.85), "JPEG", margin, 20, maxLineWidth, finalHeight);
+      
       document.body.removeChild(tempDiv);
     }
 
-    // --- ADD PAGE NUMBERS (The New Part) ---
+    // --- PAGE NUMBERS ---
     const totalPages = pdf.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       pdf.setPage(i);
       pdf.setFontSize(10);
       pdf.setTextColor(150);
-      pdf.setFont("helvetica", "normal");
-      // Text centered at bottom: "Page X of Y"
       pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: "center" });
     }
 
