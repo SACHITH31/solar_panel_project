@@ -168,122 +168,80 @@ function drawChart(data) {
 /* ---------- FAST MONTH VIEW (FIXED SPEED & GHOST DATA) ---------- */
 async function handleMonthViewRequest() {
   const loader = document.getElementById("monthLoader");
-  const mainContainer = document.getElementById("monthlyBarChartContainer");
-  const energyContainer = document.getElementById("monthlyEnergyChartContainer");
+  const chartContainer = document.getElementById("monthlyBarChartContainer");
+  const chartDiv = document.getElementById("monthlyBarChart");
   const oopsMsg = document.getElementById("oopsMessage");
 
   if (oopsMsg) oopsMsg.style.display = "none";
   loader.style.display = "block";
-  mainContainer.style.display = "none";
-  if (energyContainer) energyContainer.style.display = "none";
+  chartContainer.style.display = "none";
+  chartDiv.innerHTML = "";
 
   const month = parseInt(document.getElementById("mvMonth").value);
   const year = parseInt(document.getElementById("mvYear").value);
-  const today = new Date();
   const daysInMonth = new Date(year, month, 0).getDate();
-  const maxDay = (today.getMonth() + 1 === month && today.getFullYear() === year) ? today.getDate() : daysInMonth;
+  const today = new Date();
+  const maxDay =
+    today.getMonth() + 1 === month && today.getFullYear() === year
+      ? today.getDate()
+      : daysInMonth;
 
   const dayPromises = [];
 
   for (let d = 1; d <= maxDay; d++) {
-    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(
+      d
+    ).padStart(2, "0")}`;
     const sheetName = SHEET_PREFIX + dateStr;
-    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+      sheetName
+    )}`;
 
     dayPromises.push(
       fetch(url)
-        .then(res => res.text())
-        .then(text => {
+        .then((res) => res.text())
+        .then((text) => {
+          // VALIDATION: If data doesn't contain the date, it's a redirect to Master. Skip it.
           if (!text.includes(dateStr)) return null;
 
-          const rows = text.split("\n").filter(row => row.trim() !== "").slice(1);
-          if (rows.length < 2) return null;
-
-          // --- DEBUG PRINTING START ---
-          const firstRowCols = rows[0].split(",");
-          const lastRowCols = rows[rows.length - 1].split(",");
-
-          // Column AA is index 7 (0=A, 1=B, 2=C... 7=H? No, AA is index 26)
-          // WAIT: If Column AA is actually index 26, that might be the bug!
-          // Let's print the whole row to be sure.
-          
-          const firstWhRaw = firstRowCols[26]?.replace(/"/g, ""); 
-          const lastWhRaw = lastRowCols[26]?.replace(/"/g, "");
-
-          console.log(`--- Data for ${dateStr} ---`);
-          console.log(`First Value in Col AA: ${firstWhRaw}`);
-          console.log(`Last Value in Col AA: ${lastWhRaw}`);
-          // --- DEBUG PRINTING END ---
-
-          const firstWh = parseFloat(firstWhRaw);
-          const lastWh = parseFloat(lastWhRaw);
-
-          let energyCalcKwh = 0;
-          if (!isNaN(firstWh) && !isNaN(lastWh)) {
-            energyCalcKwh = (lastWh - firstWh) / 1000;
-            console.log(`Resulting Calculation: (${lastWh} - ${firstWh}) / 1000 = ${energyCalcKwh} kWh`);
-          }
-
-          let dailyMaxPower = 0;
-          rows.forEach(row => {
+          const rows = text.split("\n").slice(1);
+          let dailyMax = 0;
+          rows.forEach((row) => {
             const cols = row.split(",");
-            const p = parseFloat(cols[1]?.replace(/"/g, ""));
-            if (!isNaN(p) && p > dailyMaxPower) dailyMaxPower = p;
+            const val = parseFloat(cols[1]?.replace(/"/g, ""));
+            if (!isNaN(val) && val > dailyMax) dailyMax = val;
           });
 
-          return {
-            label: `${d} ${new Date(year, month - 1).toLocaleString("en", { month: "short" })}`,
-            value: dailyMaxPower,
-            energyKwh: energyCalcKwh,
-            dayNum: d
-          };
+          return dailyMax > 0
+            ? {
+                label: `${d} ${new Date(year, month - 1).toLocaleString("en", {
+                  month: "short",
+                })}`,
+                value: dailyMax,
+                dayNum: d,
+              }
+            : null;
         })
         .catch(() => null)
     );
   }
 
   const results = (await Promise.all(dayPromises))
-    .filter(r => r !== null) 
+    .filter((r) => r !== null)
     .sort((a, b) => a.dayNum - b.dayNum);
-
   loader.style.display = "none";
 
   if (results.length === 0) {
+    // alert(
+    //   `No solar data recorded for ${
+    //     document.getElementById("mvMonth").options[month - 1].text
+    //   } ${year}.`
+    // );
     if (oopsMsg) oopsMsg.style.display = "block";
     return;
   }
 
-  mainContainer.style.display = "block";
-  if (energyContainer) energyContainer.style.display = "block";
-
   drawMonthlyMaxBarChart(results, month, year);
-  drawMonthlyEnergyBarChart(results, month, year);
-}
-function drawMonthlyEnergyBarChart(dataArr, month, year) {
-  const chartDiv = document.getElementById("monthlyEnergyChart");
-  const dt = new google.visualization.DataTable();
-  dt.addColumn("string", "Date");
-  dt.addColumn("number", "Total Energy (kWh)");
-
-  dt.addRows(dataArr.map(item => [item.label, item.energyKwh]));
-
-  const options = {
-    title: `Daily Total Energy Generated (kWh) - ${month}/${year}`,
-    legend: "none",
-    height: 450,
-    colors: ["#10b981"],
-    chartArea: { left: "12%", right: "8%", top: "15%", bottom: "20%", width: "80%" },
-    hAxis: { slantedText: true, slantedTextAngle: 45 },
-    vAxis: { 
-      title: "kWh", 
-      minValue: 0,
-      format: 'decimal',
-      viewWindow: { min: 0 }
-    },
-    bar: { groupWidth: "75%" } // Makes bars thick and professional
-  };
-
-  new google.visualization.ColumnChart(chartDiv).draw(dt, options);
 }
 
 function drawMonthlyMaxBarChart(dataArr, month, year) {
