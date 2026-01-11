@@ -515,6 +515,7 @@ async function downloadDashboardSection() {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("p", "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight(); // Get height for footer placement
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
 
@@ -522,19 +523,17 @@ async function downloadDashboardSection() {
 
     // --- PAGE 1 LOGIC ---
     if (!isMonthlyActive) {
-      // If no bar graph, attach errors to mainArea temporarily for Page 1 capture
       const eventsClone = eventsArea.cloneNode(true);
       eventsClone.style.marginTop = "20px";
       mainArea.appendChild(eventsClone);
 
       const canvas = await html2canvas(mainArea, { scale: 2, useCORS: true });
-      mainArea.removeChild(eventsClone); // Clean up UI
+      mainArea.removeChild(eventsClone);
 
       addPdfHeader(pdf, dateValue, margin);
       const imgHeight = (maxLineWidth * canvas.height) / canvas.width;
       pdf.addImage(canvas.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, imgHeight);
     } else {
-      // If bar graph exists, Page 1 is just the Daily Chart
       const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
       addPdfHeader(pdf, dateValue, margin);
       const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
@@ -545,29 +544,37 @@ async function downloadDashboardSection() {
       tempDiv.style.cssText = "background:#fff; padding:20px; width:1000px; position:absolute; left:-9999px;";
       document.body.appendChild(tempDiv);
 
-      // Add Heading
       const heading = document.createElement("div");
       heading.style.cssText = "font-size:22px; font-weight:bold; color:#1a73e8; margin-bottom:15px;";
       heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} Overview`;
       tempDiv.appendChild(heading);
 
-      // Add Monthly Chart
       const chartClone = document.getElementById("monthlyBarChart").cloneNode(true);
       chartClone.style.width = "100%";
       tempDiv.appendChild(chartClone);
 
-      // Add Errors below the chart
       const eventsClone = eventsArea.cloneNode(true);
       eventsClone.style.marginTop = "30px";
       tempDiv.appendChild(eventsClone);
 
-      await new Promise(r => setTimeout(r, 500)); // Wait for render
+      await new Promise(r => setTimeout(r, 500));
       const canvasMonthly = await html2canvas(tempDiv, { scale: 2, useCORS: true });
       const monthlyHeight = (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
 
       pdf.addPage();
       pdf.addImage(canvasMonthly.toDataURL("image/jpeg", 0.85), "JPEG", margin, 20, maxLineWidth, monthlyHeight);
       document.body.removeChild(tempDiv);
+    }
+
+    // --- ADD PAGE NUMBERS (The New Part) ---
+    const totalPages = pdf.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(10);
+      pdf.setTextColor(150);
+      pdf.setFont("helvetica", "normal");
+      // Text centered at bottom: "Page X of Y"
+      pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: "center" });
     }
 
     pdf.save(`Solar_Report_${dateValue}.pdf`);
