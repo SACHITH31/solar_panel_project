@@ -14,8 +14,7 @@ const METRIC_COLUMNS = [
   { label: "VA Total", index: 3 },
   { label: "VL N Average", index: 4 },
   { label: "Current Total", index: 5 },
-  { label: "Wh", index: 7 },
-  { label: "VAh", index: 8 },
+  { label: "Wh", index: 7 }
 ];
 
 google.charts.setOnLoadCallback(init);
