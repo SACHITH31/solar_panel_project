@@ -2,4 +2,5 @@
 drawchart.txt
 .gitignore
 
+/currentWorkingBarChart.txt
 currentWorkingBarChart.txt
