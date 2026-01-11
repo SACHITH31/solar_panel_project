@@ -498,7 +498,6 @@ function closeMonthPopup() {
   document.getElementById("monthViewPopup").style.display = "none";
 }
 
-/* ---------- PDF DOWNLOAD (WITH MONTHLY BAR GRAPH + ERRORS) ---------- */
 async function downloadDashboardSection() {
   const btn = document.getElementById("downloadBtn");
   const btnText = document.getElementById("btnText");
@@ -507,10 +506,10 @@ async function downloadDashboardSection() {
   const monthlyContainer = document.getElementById("monthlyBarChartContainer");
   const mvMonth = document.getElementById("mvMonth");
   const mvYear = document.getElementById("mvYear");
-
   const dateValue = document.getElementById("datePicker").value;
+
   btn.disabled = true;
-  btnText.innerHTML = `<span class="spinner"></span> Capturing Full Report...`;
+  btnText.innerHTML = `<span class="spinner"></span> Capturing Report...`;
 
   try {
     const { jsPDF } = window.jspdf;
@@ -519,73 +518,79 @@ async function downloadDashboardSection() {
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
 
-    // ---- Capture main daily chart area ----
-    const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
-    const imgMain = canvasMain.toDataURL("image/jpeg", 0.85);
-    const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
+    const isMonthlyActive = monthlyContainer && monthlyContainer.style.display !== "none";
 
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(16);
-    pdf.setTextColor(26, 115, 232);
-    pdf.text("SOLAR PERFORMANCE & ERROR REPORT", margin, 15);
-    pdf.setFontSize(9);
-    pdf.setTextColor(100);
-    pdf.text(`Generated On: ${new Date().toLocaleString()}`, margin, 22);
-    pdf.text(`Reported Date: ${dateValue}`, margin, 27);
-    pdf.addImage(imgMain, "JPEG", margin, 28, maxLineWidth, mainHeight);
+    // --- PAGE 1 LOGIC ---
+    if (!isMonthlyActive) {
+      // If no bar graph, attach errors to mainArea temporarily for Page 1 capture
+      const eventsClone = eventsArea.cloneNode(true);
+      eventsClone.style.marginTop = "20px";
+      mainArea.appendChild(eventsClone);
 
-    // ---- If monthly bar chart exists, capture heading + chart + errors together ----
-    if (monthlyContainer && monthlyContainer.style.display !== "none") {
-      // Create a temporary container div
+      const canvas = await html2canvas(mainArea, { scale: 2, useCORS: true });
+      mainArea.removeChild(eventsClone); // Clean up UI
+
+      addPdfHeader(pdf, dateValue, margin);
+      const imgHeight = (maxLineWidth * canvas.height) / canvas.width;
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, imgHeight);
+    } else {
+      // If bar graph exists, Page 1 is just the Daily Chart
+      const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
+      addPdfHeader(pdf, dateValue, margin);
+      const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
+      pdf.addImage(canvasMain.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, mainHeight);
+
+      // --- PAGE 2 LOGIC (Bar Graph + Errors) ---
       const tempDiv = document.createElement("div");
-      tempDiv.style.background = "#fff";
-      tempDiv.style.padding = "10px";
-      tempDiv.style.display = "inline-block";
+      tempDiv.style.cssText = "background:#fff; padding:20px; width:1000px; position:absolute; left:-9999px;";
+      document.body.appendChild(tempDiv);
 
-      // Add Month + Year heading
+      // Add Heading
       const heading = document.createElement("div");
-      heading.style.fontSize = "16px";
-      heading.style.fontWeight = "bold";
-      heading.style.color = "#1a73e8";
-      heading.style.marginBottom = "5px";
-      heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value}`;
+      heading.style.cssText = "font-size:22px; font-weight:bold; color:#1a73e8; margin-bottom:15px;";
+      heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} Overview`;
       tempDiv.appendChild(heading);
 
-      // Clone the chart div
+      // Add Monthly Chart
       const chartClone = document.getElementById("monthlyBarChart").cloneNode(true);
       chartClone.style.width = "100%";
-      chartClone.style.height = "auto";
       tempDiv.appendChild(chartClone);
 
-      // Clone the events area below chart
-      const eventsClone = document.getElementById("events").cloneNode(true);
-      eventsClone.style.width = "95%";
-      eventsClone.style.height = "auto";
-      eventsClone.style.marginTop = "5px";
+      // Add Errors below the chart
+      const eventsClone = eventsArea.cloneNode(true);
+      eventsClone.style.marginTop = "30px";
       tempDiv.appendChild(eventsClone);
 
-      document.body.appendChild(tempDiv); // temporarily add to DOM
-
+      await new Promise(r => setTimeout(r, 500)); // Wait for render
       const canvasMonthly = await html2canvas(tempDiv, { scale: 2, useCORS: true });
-      const imgMonthly = canvasMonthly.toDataURL("image/jpeg", 0.85);
       const monthlyHeight = (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
 
       pdf.addPage();
-      pdf.addImage(imgMonthly, "JPEG", margin, 20, maxLineWidth, monthlyHeight);
-
-      document.body.removeChild(tempDiv); // cleanup
+      pdf.addImage(canvasMonthly.toDataURL("image/jpeg", 0.85), "JPEG", margin, 20, maxLineWidth, monthlyHeight);
+      document.body.removeChild(tempDiv);
     }
 
     pdf.save(`Solar_Report_${dateValue}.pdf`);
   } catch (error) {
     console.error(error);
-    alert("PDF Error. Ensure html2canvas and jspdf libraries are loaded.");
+    alert("PDF Error. Check console.");
   } finally {
     btn.disabled = false;
     btnText.innerText = "📝Download PDF";
   }
 }
 
+// Helper to keep header code clean
+function addPdfHeader(pdf, dateValue, margin) {
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(16);
+  pdf.setTextColor(26, 115, 232);
+  pdf.text("SOLAR PERFORMANCE & ERROR REPORT", margin, 15);
+  pdf.setFontSize(9);
+  pdf.setTextColor(100);
+  pdf.text(`Generated On: ${new Date().toLocaleString()}`, margin, 22);
+  pdf.text(`Reported Date: ${dateValue}`, margin, 27);
+}
 
 
 function getTodayDate() {
