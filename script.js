@@ -169,7 +169,9 @@ function drawChart(data) {
 async function handleMonthViewRequest() {
   const loader = document.getElementById("monthLoader");
   const mainContainer = document.getElementById("monthlyBarChartContainer");
-  const energyContainer = document.getElementById("monthlyEnergyChartContainer");
+  const energyContainer = document.getElementById(
+    "monthlyEnergyChartContainer"
+  );
   const oopsMsg = document.getElementById("oopsMessage");
 
   if (oopsMsg) oopsMsg.style.display = "none";
@@ -181,22 +183,32 @@ async function handleMonthViewRequest() {
   const year = parseInt(document.getElementById("mvYear").value);
   const today = new Date();
   const daysInMonth = new Date(year, month, 0).getDate();
-  const maxDay = (today.getMonth() + 1 === month && today.getFullYear() === year) ? today.getDate() : daysInMonth;
+  const maxDay =
+    today.getMonth() + 1 === month && today.getFullYear() === year
+      ? today.getDate()
+      : daysInMonth;
 
   const dayPromises = [];
 
   for (let d = 1; d <= maxDay; d++) {
-    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(
+      d
+    ).padStart(2, "0")}`;
     const sheetName = SHEET_PREFIX + dateStr;
-    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+      sheetName
+    )}`;
 
     dayPromises.push(
       fetch(url)
-        .then(res => res.text())
-        .then(text => {
+        .then((res) => res.text())
+        .then((text) => {
           if (!text.includes(dateStr)) return null;
 
-          const rows = text.split("\n").filter(row => row.trim() !== "").slice(1);
+          const rows = text
+            .split("\n")
+            .filter((row) => row.trim() !== "")
+            .slice(1);
           if (rows.length < 2) return null;
 
           // --- DEBUG PRINTING START ---
@@ -206,8 +218,8 @@ async function handleMonthViewRequest() {
           // Column AA is index 7 (0=A, 1=B, 2=C... 7=H? No, AA is index 26)
           // WAIT: If Column AA is actually index 26, that might be the bug!
           // Let's print the whole row to be sure.
-          
-          const firstWhRaw = firstRowCols[26]?.replace(/"/g, ""); 
+
+          const firstWhRaw = firstRowCols[26]?.replace(/"/g, "");
           const lastWhRaw = lastRowCols[26]?.replace(/"/g, "");
 
           console.log(`--- Data for ${dateStr} ---`);
@@ -221,21 +233,25 @@ async function handleMonthViewRequest() {
           let energyCalcKwh = 0;
           if (!isNaN(firstWh) && !isNaN(lastWh)) {
             energyCalcKwh = (lastWh - firstWh) / 1000;
-            console.log(`Resulting Calculation: (${lastWh} - ${firstWh}) / 1000 = ${energyCalcKwh} kWh`);
+            console.log(
+              `Resulting Calculation: (${lastWh} - ${firstWh}) / 1000 = ${energyCalcKwh} kWh`
+            );
           }
 
           let dailyMaxPower = 0;
-          rows.forEach(row => {
+          rows.forEach((row) => {
             const cols = row.split(",");
             const p = parseFloat(cols[1]?.replace(/"/g, ""));
             if (!isNaN(p) && p > dailyMaxPower) dailyMaxPower = p;
           });
 
           return {
-            label: `${d} ${new Date(year, month - 1).toLocaleString("en", { month: "short" })}`,
+            label: `${d} ${new Date(year, month - 1).toLocaleString("en", {
+              month: "short",
+            })}`,
             value: dailyMaxPower,
             energyKwh: energyCalcKwh,
-            dayNum: d
+            dayNum: d,
           };
         })
         .catch(() => null)
@@ -243,7 +259,7 @@ async function handleMonthViewRequest() {
   }
 
   const results = (await Promise.all(dayPromises))
-    .filter(r => r !== null) 
+    .filter((r) => r !== null)
     .sort((a, b) => a.dayNum - b.dayNum);
 
   loader.style.display = "none";
@@ -265,27 +281,33 @@ function drawMonthlyEnergyBarChart(dataArr, month, year) {
   dt.addColumn("string", "Date");
   dt.addColumn("number", "Total Energy (Units / kWh)");
 
-  dt.addRows(dataArr.map(item => [item.label, item.energyKwh]));
+  dt.addRows(dataArr.map((item) => [item.label, item.energyKwh]));
 
   const options = {
     title: `Daily Total Energy Generated (Units / kWh) - ${month}/${year}`,
     legend: "none",
     height: 450,
     colors: ["#10b981"],
-    chartArea: { left: "12%", right: "8%", top: "15%", bottom: "25%", width: "80%" },
-    hAxis: { 
-      title: "Date", 
-      slantedText: true, 
-      slantedTextAngle: 45,
-      showTextEvery: 1 // This ensures every date label is shown on the X-axis
+    chartArea: {
+      left: "12%",
+      right: "8%",
+      top: "15%",
+      bottom: "25%",
+      width: "80%",
     },
-    vAxis: { 
+    hAxis: {
+      title: "Date",
+      slantedText: true,
+      slantedTextAngle: 45,
+      showTextEvery: 1, // This ensures every date label is shown on the X-axis
+    },
+    vAxis: {
       title: "Units / kWh", // Updated label as requested
       minValue: 0,
-      format: '#.##',
-      viewWindow: { min: 0 }
+      format: "#.##",
+      viewWindow: { min: 0 },
     },
-    bar: { groupWidth: "75%" }
+    bar: { groupWidth: "75%" },
   };
 
   new google.visualization.ColumnChart(chartDiv).draw(dt, options);
@@ -566,7 +588,8 @@ async function downloadDashboardSection() {
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
 
-    const isMonthlyActive = monthlyContainer && monthlyContainer.style.display !== "none";
+    const isMonthlyActive =
+      monthlyContainer && monthlyContainer.style.display !== "none";
 
     // --- PAGE 1: DAILY DASHBOARD ---
     if (!isMonthlyActive) {
@@ -579,31 +602,53 @@ async function downloadDashboardSection() {
 
       addPdfHeader(pdf, dateValue, margin);
       const imgHeight = (maxLineWidth * canvas.height) / canvas.width;
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, imgHeight);
-    } 
-    else {
+      pdf.addImage(
+        canvas.toDataURL("image/jpeg", 0.85),
+        "JPEG",
+        margin,
+        30,
+        maxLineWidth,
+        imgHeight
+      );
+    } else {
       // --- PAGE 1: CURRENT VIEW ---
-      const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
+      const canvasMain = await html2canvas(mainArea, {
+        scale: 2,
+        useCORS: true,
+      });
       addPdfHeader(pdf, dateValue, margin);
       const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
-      pdf.addImage(canvasMain.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, mainHeight);
+      pdf.addImage(
+        canvasMain.toDataURL("image/jpeg", 0.85),
+        "JPEG",
+        margin,
+        30,
+        maxLineWidth,
+        mainHeight
+      );
 
       // --- PAGE 2: MONTHLY OVERVIEW (Both Graphs) ---
       const tempDiv = document.createElement("div");
       // Fixed width for high-quality capture
-      tempDiv.style.cssText = "background:#fff; padding:30px; width:1000px; position:absolute; left:-9999px;";
+      tempDiv.style.cssText =
+        "background:#fff; padding:30px; width:1000px; position:absolute; left:-9999px;";
       document.body.appendChild(tempDiv);
 
       const heading = document.createElement("div");
-      heading.style.cssText = "font-size:26px; font-weight:bold; color:#1a73e8; margin-bottom:20px; text-align:center; border-bottom:2px solid #eee; padding-bottom:10px;";
-      heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} Monthly Report`;
+      heading.style.cssText =
+        "font-size:26px; font-weight:bold; color:#1a73e8; margin-bottom:20px; text-align:center; border-bottom:2px solid #eee; padding-bottom:10px;";
+      heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${
+        mvYear.value
+      } Monthly Report`;
       tempDiv.appendChild(heading);
 
       // 1. Add Peak Power Chart Clone
       const powerLabel = document.createElement("h3");
       powerLabel.innerText = "1. Daily Peak Power Generation (Watts)";
       tempDiv.appendChild(powerLabel);
-      const chart1Clone = document.getElementById("monthlyBarChart").cloneNode(true);
+      const chart1Clone = document
+        .getElementById("monthlyBarChart")
+        .cloneNode(true);
       chart1Clone.style.width = "100%";
       tempDiv.appendChild(chart1Clone);
 
@@ -612,14 +657,18 @@ async function downloadDashboardSection() {
       energyLabel.style.marginTop = "30px";
       energyLabel.innerText = "2. Daily Total Energy (Units / kWh)";
       tempDiv.appendChild(energyLabel);
-      const chart2Clone = document.getElementById("monthlyEnergyChart").cloneNode(true);
+      const chart2Clone = document
+        .getElementById("monthlyEnergyChart")
+        .cloneNode(true);
       chart2Clone.style.width = "100%";
       tempDiv.appendChild(chart2Clone);
 
       // 3. Add Formula/Info Note
       const infoNote = document.createElement("div");
-      infoNote.style.cssText = "margin-top:10px; font-style:italic; color:#666; font-size:14px;";
-      infoNote.innerText = "Note: Energy Units calculated as (Last Value - First Value) / 1000";
+      infoNote.style.cssText =
+        "margin-top:10px; font-style:italic; color:#666; font-size:14px;";
+      infoNote.innerText =
+        "Note: Energy Units calculated as (Last Value - First Value) / 1000";
       tempDiv.appendChild(infoNote);
 
       // 4. Add System Alerts
@@ -631,15 +680,27 @@ async function downloadDashboardSection() {
       tempDiv.appendChild(eventsClone);
 
       // Render to PDF
-      await new Promise(r => setTimeout(r, 600)); // Buffer for rendering
-      const canvasMonthly = await html2canvas(tempDiv, { scale: 2, useCORS: true });
-      const monthlyHeight = (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
+      await new Promise((r) => setTimeout(r, 600)); // Buffer for rendering
+      const canvasMonthly = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+      });
+      const monthlyHeight =
+        (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
 
       pdf.addPage();
       // If content is too long for one page, we scale it to fit A4
-      const finalHeight = monthlyHeight > (pageHeight - 40) ? (pageHeight - 40) : monthlyHeight;
-      pdf.addImage(canvasMonthly.toDataURL("image/jpeg", 0.85), "JPEG", margin, 20, maxLineWidth, finalHeight);
-      
+      const finalHeight =
+        monthlyHeight > pageHeight - 40 ? pageHeight - 40 : monthlyHeight;
+      pdf.addImage(
+        canvasMonthly.toDataURL("image/jpeg", 0.85),
+        "JPEG",
+        margin,
+        20,
+        maxLineWidth,
+        finalHeight
+      );
+
       document.body.removeChild(tempDiv);
     }
 
@@ -649,7 +710,9 @@ async function downloadDashboardSection() {
       pdf.setPage(i);
       pdf.setFontSize(10);
       pdf.setTextColor(150);
-      pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: "center" });
+      pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, {
+        align: "center",
+      });
     }
 
     pdf.save(`Solar_Report_${dateValue}.pdf`);
@@ -673,7 +736,6 @@ function addPdfHeader(pdf, dateValue, margin) {
   pdf.text(`Generated On: ${new Date().toLocaleString()}`, margin, 22);
   pdf.text(`Reported Date: ${dateValue}`, margin, 27);
 }
-
 
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];
