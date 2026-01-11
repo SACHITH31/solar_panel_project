@@ -14,7 +14,7 @@ const METRIC_COLUMNS = [
   { label: "VA Total", index: 3 },
   { label: "VL N Average", index: 4 },
   { label: "Current Total", index: 5 },
-  { label: "Wh", index: 7 }
+  { label: "Wh", index: 7 },
 ];
 
 google.charts.setOnLoadCallback(init);
@@ -498,15 +498,17 @@ function closeMonthPopup() {
   document.getElementById("monthViewPopup").style.display = "none";
 }
 
-/* ---------- PDF DOWNLOAD (FIXED) ---------- */
+/* ---------- PDF DOWNLOAD (WITH MONTHLY BAR GRAPH + ERRORS) ---------- */
 async function downloadDashboardSection() {
   const btn = document.getElementById("downloadBtn");
   const btnText = document.getElementById("btnText");
   const mainArea = document.getElementById("download-area");
   const eventsArea = document.getElementById("events");
-  const monthlyChartContainer = document.getElementById("monthlyBarChartContainer");
-  const dateValue = document.getElementById("datePicker").value;
+  const monthlyContainer = document.getElementById("monthlyBarChartContainer");
+  const mvMonth = document.getElementById("mvMonth");
+  const mvYear = document.getElementById("mvYear");
 
+  const dateValue = document.getElementById("datePicker").value;
   btn.disabled = true;
   btnText.innerHTML = `<span class="spinner"></span> Capturing Full Report...`;
 
@@ -517,7 +519,7 @@ async function downloadDashboardSection() {
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
 
-    // --- Capture main area ---
+    // ---- Capture main daily chart area ----
     const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
     const imgMain = canvasMain.toDataURL("image/jpeg", 0.85);
     const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
@@ -530,37 +532,48 @@ async function downloadDashboardSection() {
     pdf.setTextColor(100);
     pdf.text(`Generated On: ${new Date().toLocaleString()}`, margin, 22);
     pdf.text(`Reported Date: ${dateValue}`, margin, 27);
-
     pdf.addImage(imgMain, "JPEG", margin, 28, maxLineWidth, mainHeight);
 
-    let currentY = 28 + mainHeight + 5;
+    // ---- If monthly bar chart exists, capture heading + chart + errors together ----
+    if (monthlyContainer && monthlyContainer.style.display !== "none") {
+      // Create a temporary container div
+      const tempDiv = document.createElement("div");
+      tempDiv.style.background = "#fff";
+      tempDiv.style.padding = "10px";
+      tempDiv.style.display = "inline-block";
 
-    // --- Capture monthly bar chart if it exists and is visible ---
-    if (monthlyChartContainer && monthlyChartContainer.style.display !== "none") {
-      const canvasMonthly = await html2canvas(monthlyChartContainer, { scale: 2, useCORS: true });
+      // Add Month + Year heading
+      const heading = document.createElement("div");
+      heading.style.fontSize = "16px";
+      heading.style.fontWeight = "bold";
+      heading.style.color = "#1a73e8";
+      heading.style.marginBottom = "5px";
+      heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value}`;
+      tempDiv.appendChild(heading);
+
+      // Clone the chart div
+      const chartClone = document.getElementById("monthlyBarChart").cloneNode(true);
+      chartClone.style.width = "100%";
+      chartClone.style.height = "auto";
+      tempDiv.appendChild(chartClone);
+
+      // Clone the events area below chart
+      const eventsClone = document.getElementById("events").cloneNode(true);
+      eventsClone.style.width = "95%";
+      eventsClone.style.height = "auto";
+      eventsClone.style.marginTop = "5px";
+      tempDiv.appendChild(eventsClone);
+
+      document.body.appendChild(tempDiv); // temporarily add to DOM
+
+      const canvasMonthly = await html2canvas(tempDiv, { scale: 2, useCORS: true });
       const imgMonthly = canvasMonthly.toDataURL("image/jpeg", 0.85);
       const monthlyHeight = (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
 
-      if (currentY + monthlyHeight > 280) {
-        pdf.addPage();
-        pdf.addImage(imgMonthly, "JPEG", margin, 20, maxLineWidth, monthlyHeight);
-      } else {
-        pdf.addImage(imgMonthly, "JPEG", margin, currentY, maxLineWidth, monthlyHeight);
-      }
-
-      currentY += monthlyHeight + 5;
-    }
-
-    // --- Capture events area ---
-    const canvasEvents = await html2canvas(eventsArea, { scale: 2, useCORS: true });
-    const imgEvents = canvasEvents.toDataURL("image/jpeg", 0.85);
-    const eventsHeight = (maxLineWidth * canvasEvents.height) / canvasEvents.width;
-
-    if (currentY + eventsHeight > 280) {
       pdf.addPage();
-      pdf.addImage(imgEvents, "JPEG", margin, 20, maxLineWidth, eventsHeight);
-    } else {
-      pdf.addImage(imgEvents, "JPEG", margin, currentY, maxLineWidth, eventsHeight);
+      pdf.addImage(imgMonthly, "JPEG", margin, 20, maxLineWidth, monthlyHeight);
+
+      document.body.removeChild(tempDiv); // cleanup
     }
 
     pdf.save(`Solar_Report_${dateValue}.pdf`);
@@ -572,6 +585,7 @@ async function downloadDashboardSection() {
     btnText.innerText = "📝Download PDF";
   }
 }
+
 
 
 function getTodayDate() {
