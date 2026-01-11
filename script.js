@@ -263,24 +263,29 @@ function drawMonthlyEnergyBarChart(dataArr, month, year) {
   const chartDiv = document.getElementById("monthlyEnergyChart");
   const dt = new google.visualization.DataTable();
   dt.addColumn("string", "Date");
-  dt.addColumn("number", "Total Energy (kWh)");
+  dt.addColumn("number", "Total Energy (Units / kWh)");
 
   dt.addRows(dataArr.map(item => [item.label, item.energyKwh]));
 
   const options = {
-    title: `Daily Total Energy Generated (kWh) - ${month}/${year}`,
+    title: `Daily Total Energy Generated (Units / kWh) - ${month}/${year}`,
     legend: "none",
     height: 450,
     colors: ["#10b981"],
-    chartArea: { left: "12%", right: "8%", top: "15%", bottom: "20%", width: "80%" },
-    hAxis: { slantedText: true, slantedTextAngle: 45 },
+    chartArea: { left: "12%", right: "8%", top: "15%", bottom: "25%", width: "80%" },
+    hAxis: { 
+      title: "Date", 
+      slantedText: true, 
+      slantedTextAngle: 45,
+      showTextEvery: 1 // This ensures every date label is shown on the X-axis
+    },
     vAxis: { 
-      title: "kWh", 
+      title: "Units / kWh", // Updated label as requested
       minValue: 0,
-      format: 'decimal',
+      format: '#.##',
       viewWindow: { min: 0 }
     },
-    bar: { groupWidth: "75%" } // Makes bars thick and professional
+    bar: { groupWidth: "75%" }
   };
 
   new google.visualization.ColumnChart(chartDiv).draw(dt, options);
