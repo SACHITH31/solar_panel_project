@@ -504,6 +504,7 @@ async function downloadDashboardSection() {
   const btnText = document.getElementById("btnText");
   const mainArea = document.getElementById("download-area");
   const eventsArea = document.getElementById("events");
+  const monthlyChartContainer = document.getElementById("monthlyBarChartContainer");
   const dateValue = document.getElementById("datePicker").value;
 
   btn.disabled = true;
@@ -516,6 +517,7 @@ async function downloadDashboardSection() {
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
 
+    // --- Capture main area ---
     const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
     const imgMain = canvasMain.toDataURL("image/jpeg", 0.85);
     const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
@@ -531,26 +533,34 @@ async function downloadDashboardSection() {
 
     pdf.addImage(imgMain, "JPEG", margin, 28, maxLineWidth, mainHeight);
 
-    const canvasEvents = await html2canvas(eventsArea, {
-      scale: 2,
-      useCORS: true,
-    });
-    const imgEvents = canvasEvents.toDataURL("image/jpeg", 0.85);
-    const eventsHeight =
-      (maxLineWidth * canvasEvents.height) / canvasEvents.width;
+    let currentY = 28 + mainHeight + 5;
 
-    if (28 + mainHeight + eventsHeight + 10 > 280) {
+    // --- Capture monthly bar chart if it exists and is visible ---
+    if (monthlyChartContainer && monthlyChartContainer.style.display !== "none") {
+      const canvasMonthly = await html2canvas(monthlyChartContainer, { scale: 2, useCORS: true });
+      const imgMonthly = canvasMonthly.toDataURL("image/jpeg", 0.85);
+      const monthlyHeight = (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
+
+      if (currentY + monthlyHeight > 280) {
+        pdf.addPage();
+        pdf.addImage(imgMonthly, "JPEG", margin, 20, maxLineWidth, monthlyHeight);
+      } else {
+        pdf.addImage(imgMonthly, "JPEG", margin, currentY, maxLineWidth, monthlyHeight);
+      }
+
+      currentY += monthlyHeight + 5;
+    }
+
+    // --- Capture events area ---
+    const canvasEvents = await html2canvas(eventsArea, { scale: 2, useCORS: true });
+    const imgEvents = canvasEvents.toDataURL("image/jpeg", 0.85);
+    const eventsHeight = (maxLineWidth * canvasEvents.height) / canvasEvents.width;
+
+    if (currentY + eventsHeight > 280) {
       pdf.addPage();
       pdf.addImage(imgEvents, "JPEG", margin, 20, maxLineWidth, eventsHeight);
     } else {
-      pdf.addImage(
-        imgEvents,
-        "JPEG",
-        margin,
-        28 + mainHeight + 5,
-        maxLineWidth,
-        eventsHeight
-      );
+      pdf.addImage(imgEvents, "JPEG", margin, currentY, maxLineWidth, eventsHeight);
     }
 
     pdf.save(`Solar_Report_${dateValue}.pdf`);
@@ -562,6 +572,7 @@ async function downloadDashboardSection() {
     btnText.innerText = "📝Download PDF";
   }
 }
+
 
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];

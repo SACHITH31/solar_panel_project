@@ -48,3 +48,6 @@ function drawChart(data) {
 ```
 - WHAT THE ABOVE CODE DOES IN SIMPLE AND SHORT:
 The code defines a function to draw a line chart using Google Charts, displaying solar power generation over time with customized options for appearance and axes.# PREPARATION:
+
+
+<!-- 284cfa2d76b53eaa50f053a1289cb8a15464d8d3 -->
