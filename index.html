@@ -195,6 +195,19 @@
       <section id="events" class="event-card">
         <div id="event-message">No error detections occurred.</div>
       </section>
+      <section id="lifetime-stats" class="chart-card" style="margin-top: 30px;">
+        <h3>📅 Monthly Energy Generation</h3>
+        <p style="text-align:center; color:#666; font-size:0.9rem;">
+          Aggregated data from Nov 2025 to Present
+        </p>
+        
+        <div id="lifetimeLoader" style="text-align: center; padding: 20px;">
+          <span class="spinner"></span> 
+          <span id="lifetimeStatusText">Initializing lifetime data...</span>
+        </div>
+
+        <div id="lifetimeChartDiv" style="width: 100%; height: 400px; display:none;"></div>
+      </section>
     </div>
 
     <script src="script.js"></script>
