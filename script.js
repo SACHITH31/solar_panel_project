@@ -220,9 +220,9 @@ async function handleMonthViewRequest() {
   drawMonthlyEnergyBarChart(results, month, year);
 }
 
-// Extracted this logic to be reusable for the new feature
-// REPLACE your existing fetchDailyEnergyStats function with this one:
-
+// =========================================================
+// 🛑 UPDATED FUNCTION: Includes Bug Fix for "Random Data"
+// =========================================================
 function fetchDailyEnergyStats(dateStr, dayNum) {
   const sheetName = SHEET_PREFIX + dateStr;
   const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
@@ -237,7 +237,6 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
     .then((text) => {
       // 1. Basic Validity Checks
       if (!text || text.trim() === "" || text.includes("<!DOCTYPE html>")) {
-         console.warn(`⚠️ [${dateStr}] Sheet missing or empty.`);
          return null;
       }
 
@@ -248,7 +247,28 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
 
       if (rows.length < 2) return null;
 
-      // 2. Get First Value (Start of Day) - LOOP FORWARD
+      // 2. DATA VALIDATION (THE BUG FIX)
+      // Check if the file content actually matches the requested date.
+      // If Google returns the "Main Sheet" by mistake, the dates won't match.
+      const firstRowCols = rows[0].split(",");
+      const fileDateRaw = firstRowCols[0]?.replace(/["\r]/g, ""); // Column A is Timestamp
+      
+      const fileDate = new Date(fileDateRaw);
+      const requestedDate = new Date(dateStr);
+
+      // Compare Year, Month, and Date
+      const isSameDay = 
+          fileDate.getFullYear() === requestedDate.getFullYear() &&
+          fileDate.getMonth() === requestedDate.getMonth() &&
+          fileDate.getDate() === requestedDate.getDate();
+
+      if (!isSameDay) {
+          // This prevents the "Random Data" bug
+          return null;
+      }
+
+      // 3. GRAPH 2 LOGIC: Energy (Wh) from Column AA
+      // Get First Value (Start of Day) - LOOP FORWARD
       let firstWh = NaN;
       for (let i = 0; i < rows.length; i++) {
          const cols = rows[i].split(",");
@@ -258,12 +278,12 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
              const val = parseFloat(rawVal);
              if (!isNaN(val)) {
                  firstWh = val;
-                 break; // Found valid start value, stop looking
+                 break; 
              }
          }
       }
 
-      // 3. Get Last Value (End of Day) - LOOP BACKWARD
+      // Get Last Value (End of Day) - LOOP BACKWARD
       let lastWh = NaN;
       for (let i = rows.length - 1; i >= 0; i--) {
         const cols = rows[i].split(",");
@@ -273,24 +293,21 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
             const val = parseFloat(rawVal);
             if (!isNaN(val)) {
                 lastWh = val;
-                break; // Found valid end value, stop looking
+                break; 
             }
         }
       }
 
-      // 4. Calculate
+      // Calculate Energy
       let energyCalcKwh = 0;
       if (!isNaN(firstWh) && !isNaN(lastWh)) {
         energyCalcKwh = (lastWh - firstWh) / 1000;
-
-        // LOG SUCCESS
-        console.log(`📝 [${dateStr}] First: ${firstWh} | Last: ${lastWh} | Result: ${energyCalcKwh.toFixed(4)} kWh`);
+        console.log(`📝 [${dateStr}] Verified Data. Result: ${energyCalcKwh.toFixed(4)} kWh`);
       } else {
-        console.warn(`⚠️ [${dateStr}] Could not find valid data in Col AA (File might be empty columns).`);
         return null;
       }
 
-      // 5. Get Peak Power (Max Watts)
+      // 4. GRAPH 1 LOGIC: Max Power (Watts) from Column B
       let dailyMaxPower = 0;
       rows.forEach((row) => {
         const cols = row.split(",");
@@ -310,7 +327,6 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
     })
     .catch((err) => null);
 }
-
 
 function drawMonthlyEnergyBarChart(dataArr, month, year) {
   const chartDiv = document.getElementById("monthlyEnergyChart");
@@ -474,7 +490,7 @@ function drawLifetimeChart(dataArr) {
     const options = {
         title: 'Total Energy Generated per Month (Cumulative)',
         legend: { position: 'none' },
-        colors: ['#8b5cf6'],
+        colors: ['#ea7f1b'],
         bar: { groupWidth: '60%' },
         vAxis: { 
             title: 'Energy (kWh)',
