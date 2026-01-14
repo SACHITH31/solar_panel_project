@@ -248,16 +248,23 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
 
       if (rows.length < 2) return null;
 
-      // 2. Get First Value (Start of Day)
-      // Clean quotes and whitespace
-      const firstRowCols = rows[0].split(",");
-      const firstWhRaw = firstRowCols[26]?.replace(/["\r]/g, "").trim(); 
-      const firstWh = parseFloat(firstWhRaw);
+      // 2. Get First Value (Start of Day) - LOOP FORWARD
+      let firstWh = NaN;
+      for (let i = 0; i < rows.length; i++) {
+         const cols = rows[i].split(",");
+         const rawVal = cols[26]?.replace(/["\r]/g, "").trim(); // Col AA is Index 26
+         
+         if (rawVal && rawVal !== "") {
+             const val = parseFloat(rawVal);
+             if (!isNaN(val)) {
+                 firstWh = val;
+                 break; // Found valid start value, stop looking
+             }
+         }
+      }
 
-      // 3. Get Last Value (End of Day) - THE FIX
-      // Loop backwards from the bottom to find the first NON-EMPTY value
+      // 3. Get Last Value (End of Day) - LOOP BACKWARD
       let lastWh = NaN;
-      
       for (let i = rows.length - 1; i >= 0; i--) {
         const cols = rows[i].split(",");
         const rawVal = cols[26]?.replace(/["\r]/g, "").trim();
@@ -266,7 +273,7 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
             const val = parseFloat(rawVal);
             if (!isNaN(val)) {
                 lastWh = val;
-                break; // Found it! Stop looking.
+                break; // Found valid end value, stop looking
             }
         }
       }
@@ -279,7 +286,7 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
         // LOG SUCCESS
         console.log(`📝 [${dateStr}] First: ${firstWh} | Last: ${lastWh} | Result: ${energyCalcKwh.toFixed(4)} kWh`);
       } else {
-        console.warn(`⚠️ [${dateStr}] Could not find valid start/end values in Col AA.`);
+        console.warn(`⚠️ [${dateStr}] Could not find valid data in Col AA (File might be empty columns).`);
         return null;
       }
 
