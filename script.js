@@ -221,6 +221,8 @@ async function handleMonthViewRequest() {
 }
 
 // Extracted this logic to be reusable for the new feature
+// REPLACE your existing fetchDailyEnergyStats function with this one:
+
 function fetchDailyEnergyStats(dateStr, dayNum) {
   const sheetName = SHEET_PREFIX + dateStr;
   const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
@@ -228,43 +230,67 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
   )}`;
 
   return fetch(url)
-    .then((res) => res.text())
+    .then((res) => {
+      if (!res.ok) return null;
+      return res.text();
+    })
     .then((text) => {
-      if (!text.includes(dateStr)) return null;
+      // 1. Basic Validity Checks
+      if (!text || text.trim() === "" || text.includes("<!DOCTYPE html>")) {
+         console.warn(`⚠️ [${dateStr}] Sheet missing or empty.`);
+         return null;
+      }
 
       const rows = text
         .split("\n")
         .filter((row) => row.trim() !== "")
-        .slice(1);
+        .slice(1); // Remove header
+
       if (rows.length < 2) return null;
 
-      // Col AA is index 26
+      // 2. Get First Value (Start of Day)
+      // Clean quotes and whitespace
       const firstRowCols = rows[0].split(",");
-      const lastRowCols = rows[rows.length - 1].split(",");
-
-      const firstWhRaw = firstRowCols[26]?.replace(/"/g, "");
-      const lastWhRaw = lastRowCols[26]?.replace(/"/g, "");
-
+      const firstWhRaw = firstRowCols[26]?.replace(/["\r]/g, "").trim(); 
       const firstWh = parseFloat(firstWhRaw);
-      const lastWh = parseFloat(lastWhRaw);
 
+      // 3. Get Last Value (End of Day) - THE FIX
+      // Loop backwards from the bottom to find the first NON-EMPTY value
+      let lastWh = NaN;
+      
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const cols = rows[i].split(",");
+        const rawVal = cols[26]?.replace(/["\r]/g, "").trim();
+        
+        if (rawVal && rawVal !== "") {
+            const val = parseFloat(rawVal);
+            if (!isNaN(val)) {
+                lastWh = val;
+                break; // Found it! Stop looking.
+            }
+        }
+      }
+
+      // 4. Calculate
       let energyCalcKwh = 0;
       if (!isNaN(firstWh) && !isNaN(lastWh)) {
         energyCalcKwh = (lastWh - firstWh) / 1000;
-        
-        // --- DEBUG CONSOLE LOG FOR USER CONFIRMATION ---
-        console.log(`📝 [${dateStr}] First Value (AA): ${firstWh} | Last Value (AA): ${lastWh} | Result: (${lastWh} - ${firstWh}) / 1000 = ${energyCalcKwh.toFixed(4)} kWh`);
-        // -----------------------------------------------
+
+        // LOG SUCCESS
+        console.log(`📝 [${dateStr}] First: ${firstWh} | Last: ${lastWh} | Result: ${energyCalcKwh.toFixed(4)} kWh`);
+      } else {
+        console.warn(`⚠️ [${dateStr}] Could not find valid start/end values in Col AA.`);
+        return null;
       }
 
+      // 5. Get Peak Power (Max Watts)
       let dailyMaxPower = 0;
       rows.forEach((row) => {
         const cols = row.split(",");
-        const p = parseFloat(cols[1]?.replace(/"/g, ""));
+        const p = parseFloat(cols[1]?.replace(/["\r]/g, ""));
         if (!isNaN(p) && p > dailyMaxPower) dailyMaxPower = p;
       });
 
-      // Getting month/year from dateStr
       const dDate = new Date(dateStr);
       const label = `${dDate.getDate()} ${dDate.toLocaleString("en", { month: "short" })}`;
 
@@ -275,7 +301,7 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
         dayNum: dayNum || dDate.getDate(),
       };
     })
-    .catch(() => null);
+    .catch((err) => null);
 }
 
 
