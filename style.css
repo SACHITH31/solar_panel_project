@@ -631,7 +631,6 @@ option {
 
 #monthlyBarChartContainer {
   background: white;
-  padding: 15px;
   border-radius: 8px;
 }
 /* Keeps buttons together in a line */
@@ -675,4 +674,132 @@ option {
   max-width: 100%;
   overflow: hidden; /* Added for extra safety */
   margin-top: 20px;
+}
+
+
+/* =========================================
+   RESPONSIVE FIXES (Phone Layout)
+   ========================================= */
+
+/* 1. Fix the "Input Field Outside" & "Clumped Buttons" */
+@media (max-width: 768px) {
+  /* Stack the controls vertically on phone */
+  #controls, .controls-container, .header-inputs { 
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Space between items */
+    width: 100%;
+    align-items: center;
+  }
+
+  /* Make inputs and buttons full width or nice and wide */
+  input, select, button {
+    width: 100% !important; /* Forces them to fit the screen width */
+    max-width: 100%;
+    margin: 0 !important; /* Removes side margins that cause overflow */
+    box-sizing: border-box; /* Ensures padding doesn't widen the element */
+  }
+  
+  /* Specifically for the Month View controls (Month + Year + OK) */
+  .month-view-controls { 
+    display: flex;
+    flex-wrap: wrap; /* Allows them to drop to next line */
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  /* Fix the "OK" button getting squashed */
+  .month-view-controls button {
+    width: auto !important; /* Let the button be its natural size */
+    padding: 10px 30px;
+  }
+}
+
+/* 2. Fix "Graph going outside" and "Graph Clumping" */
+/* We wrap charts in a scrollable box on mobile. 
+   This keeps the bars wide (readable) but adds a scrollbar. */
+
+.chart-container, #monthlyBarChartContainer {
+  width: 100%;
+  overflow-x: auto; /* Adds horizontal scroll if graph is too big */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iPhone */
+  padding-bottom: 10px;
+}
+
+/* Force the charts to maintain a minimum width on phones. 
+   This prevents the "clumping" by forcing the graph to be wide. */
+#monthlyBarChart, #monthlyEnergyChart, canvas {
+  min-width: 600px; /* Forces graph to be wide. User scrolls right to see all dates. */
+}
+
+/* =========================================
+   RESPONSIVE FIXES (Phone Layout)
+   ========================================= */
+
+/* 1. Fix the Month/Year Inputs squashing on phone */
+@media (max-width: 768px) {
+  /* This targets the container holding Month, Year, and OK */
+  .swal2-content .month-view-controls, 
+  #controls, 
+  .header-inputs { 
+    display: flex;
+    flex-direction: column; /* Stack them top-to-bottom */
+    gap: 10px;
+    width: 100%;
+    align-items: center;
+  }
+
+  /* Make the dropdowns and buttons wide and easy to tap */
+  .swal2-content select, 
+  .swal2-content button,
+  #mvMonth, #mvYear, #mvBtn {
+    width: 100% !important; 
+    max-width: 100%;
+    margin: 5px 0 !important;
+    padding: 12px;
+    box-sizing: border-box;
+  }
+}
+
+/* 2. Fix Graphs "Going Outside" or "Clumping" */
+/* We put the graph in a box that allows sideways scrolling */
+#monthlyBarChartContainer, .chart-container {
+  width: 100%;
+  overflow-x: auto; /* Adds a scrollbar if graph is too wide */
+  -webkit-overflow-scrolling: touch; /* Smooth scroll on iPhone */
+  padding-bottom: 15px; /* Space for the scrollbar */
+  display: block; /* Ensures it respects width */
+}
+
+/* Force the charts to stay wide so bars don't get thin/clumped */
+#monthlyBarChart, #monthlyEnergyChart {
+  min-width: 160px; /* If screen is smaller than this, it will scroll */
+  margin: 0 auto;
+}
+
+/* =========================================
+   CENTERING FIX (For Monthly Bar Graphs)
+   ========================================= */
+
+/* 1. Center the Titles and Container Text */
+#monthlyBarChartContainer, 
+#monthlyBarChartContainer h3, 
+#monthlyBarChartContainer h4, 
+.chart-title {
+  text-align: center !important;
+}
+
+/* 2. Center the Canvas (The Graphs themselves) */
+#monthlyBarChart, 
+#monthlyEnergyChart {
+  display: block;      /* Ensures they behave like blocks */
+  margin: 0 auto !important; /* This Magic Code pushes them to the middle */
+}
+
+/* 3. Ensure the scrollable area (if used) keeps items centered */
+.chart-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Forces flex items to center */
+  width: 100%;
 }

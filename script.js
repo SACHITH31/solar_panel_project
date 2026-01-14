@@ -302,7 +302,7 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
       let energyCalcKwh = 0;
       if (!isNaN(firstWh) && !isNaN(lastWh)) {
         energyCalcKwh = (lastWh - firstWh) / 1000;
-        console.log(`📝 [${dateStr}] Verified Data. Result: ${energyCalcKwh.toFixed(4)} kWh`);
+        // console.log(`📝 [${dateStr}] Verified Data. Result: ${energyCalcKwh.toFixed(4)} kWh`);
       } else {
         return null;
       }
@@ -456,8 +456,8 @@ async function generateLifetimeGraph() {
     
     // --- DEBUG CONSOLE LOG FOR USER CONFIRMATION ---
     const monthName = new Date(mData.year, mData.month - 1).toLocaleString('default', { month: 'long' });
-    console.log(`✅ >>> TOTAL FOR ${monthName} ${mData.year}: ${monthSum.toFixed(4)} kWh <<<`);
-    console.log("---------------------------------------------------------------");
+    // console.log(`✅ >>> TOTAL FOR ${monthName} ${mData.year}: ${monthSum.toFixed(4)} kWh <<<`);
+    // console.log("---------------------------------------------------------------");
     // -----------------------------------------------
 
     monthlyTotals.push({
@@ -704,7 +704,7 @@ async function downloadDashboardSection() {
   const mainArea = document.getElementById("download-area");
   const eventsArea = document.getElementById("events");
   const monthlyContainer = document.getElementById("monthlyBarChartContainer");
-  const lifetimeChart = document.getElementById("lifetimeChartDiv"); // NEW: Get Lifetime Chart
+  const lifetimeChart = document.getElementById("lifetimeChartDiv");
   const mvMonth = document.getElementById("mvMonth");
   const mvYear = document.getElementById("mvYear");
   const dateValue = document.getElementById("datePicker").value;
@@ -720,15 +720,11 @@ async function downloadDashboardSection() {
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
 
-    const isMonthlyActive =
-      monthlyContainer && monthlyContainer.style.display !== "none";
+    const isMonthlyActive = monthlyContainer && monthlyContainer.style.display !== "none";
 
-    // ======================================================
-    // PAGE 1: DAILY DASHBOARD (or Monthly View Page 1)
-    // ======================================================
+    // --- PAGE 1: DAILY DASHBOARD ---
     if (!isMonthlyActive) {
-      // --- SCENARIO A: NORMAL DAILY VIEW ---
-      // We attach events temporarily to the main area to capture them on Page 1 (or 2 if long)
+      // Daily View Logic
       const eventsClone = eventsArea.cloneNode(true);
       eventsClone.style.marginTop = "20px";
       mainArea.appendChild(eventsClone);
@@ -738,145 +734,115 @@ async function downloadDashboardSection() {
 
       addPdfHeader(pdf, dateValue, margin);
       const imgHeight = (maxLineWidth * canvas.height) / canvas.width;
-      
-      // If daily view is very long, it might need scaling, but usually fits on P1
-      pdf.addImage(
-        canvas.toDataURL("image/jpeg", 0.85),
-        "JPEG",
-        margin,
-        30,
-        maxLineWidth,
-        imgHeight
-      );
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, imgHeight);
     } else {
-      // --- SCENARIO B: MONTHLY VIEW ACTIVE ---
-      // Page 1: Just the Main Dashboard (Watts/Live data)
-      const canvasMain = await html2canvas(mainArea, {
-        scale: 2,
-        useCORS: true,
-      });
+      // --- PAGE 1 (Monthly View Active) ---
+      const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
       addPdfHeader(pdf, dateValue, margin);
       const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
-      pdf.addImage(
-        canvasMain.toDataURL("image/jpeg", 0.85),
-        "JPEG",
-        margin,
-        30,
-        maxLineWidth,
-        mainHeight
-      );
+      pdf.addImage(canvasMain.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, mainHeight);
 
-      // Page 2: Monthly Graphs + Error Messages
+      // =========================================================
+      // PAGE 2: MONTHLY GRAPHS (CENTERING FIX)
+      // =========================================================
+      
+      // 1. Create a temporary container that forces centering
       const tempDiv = document.createElement("div");
-      tempDiv.style.cssText =
-        "background:#fff; padding:30px; width:1000px; position:absolute; left:-9999px;";
+      tempDiv.style.cssText = `
+        background: #ffffff; 
+        padding: 40px; 
+        width: 1100px; /* Fixed wide width ensures high quality on phone */
+        position: absolute; 
+        left: -9999px; 
+        top: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* THIS CENTERS THE GRAPHS */
+        justify-content: center;
+        text-align: center;
+      `;
       document.body.appendChild(tempDiv);
 
+      // 2. Add Main Title
       const heading = document.createElement("div");
-      heading.style.cssText =
-        "font-size:26px; font-weight:bold; color:#1a73e8; margin-bottom:20px; text-align:center; border-bottom:2px solid #eee; padding-bottom:10px;";
-      heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${
-        mvYear.value
-      } Monthly Report`;
+      heading.style.cssText = "font-size:32px; font-weight:bold; color:#1a73e8; margin-bottom:10px; text-transform: uppercase; width: 100%; text-align: center;";
+      heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} MONTHLY REPORT`;
       tempDiv.appendChild(heading);
 
-      // 1. Peak Power Chart
+      const subHeading = document.createElement("div");
+      subHeading.style.cssText = "font-size:16px; font-style:italic; color:#666; margin-bottom:40px; width: 100%; text-align: center;";
+      subHeading.innerText = "Detailed daily breakdown of Power and Energy";
+      tempDiv.appendChild(subHeading);
+
+      // 3. Peak Power Chart
       const powerLabel = document.createElement("h3");
       powerLabel.innerText = "1. Daily Peak Power Generation (Watts)";
+      powerLabel.style.cssText = "width: 100%; text-align: center; margin-top: 20px;";
       tempDiv.appendChild(powerLabel);
-      const chart1Clone = document
-        .getElementById("monthlyBarChart")
-        .cloneNode(true);
-      chart1Clone.style.width = "100%";
+      
+      const chart1Clone = document.getElementById("monthlyBarChart").cloneNode(true);
+      // FORCE CENTERING ON THE GRAPH ITSELF
+      chart1Clone.style.cssText = "width: 85% !important; margin: 0 auto !important; display: block;";
       tempDiv.appendChild(chart1Clone);
 
-      // 2. Energy Units Chart
+      // 4. Energy Units Chart
       const energyLabel = document.createElement("h3");
-      energyLabel.style.marginTop = "30px";
       energyLabel.innerText = "2. Daily Total Energy (Units / kWh)";
+      energyLabel.style.cssText = "width: 100%; text-align: center; margin-top: 40px;";
       tempDiv.appendChild(energyLabel);
-      const chart2Clone = document
-        .getElementById("monthlyEnergyChart")
-        .cloneNode(true);
-      chart2Clone.style.width = "100%";
+      
+      const chart2Clone = document.getElementById("monthlyEnergyChart").cloneNode(true);
+      // FORCE CENTERING ON THE GRAPH ITSELF
+      chart2Clone.style.cssText = "width: 85% !important; margin: 0 auto !important; display: block;";
       tempDiv.appendChild(chart2Clone);
 
       const infoNote = document.createElement("div");
-      infoNote.style.cssText =
-        "margin-top:10px; font-style:italic; color:#666; font-size:14px;";
-      infoNote.innerText =
-        "Note: Energy Units calculated as (Last Value - First Value) / 1000";
+      infoNote.style.cssText = "margin-top:10px; font-style:italic; color:#666; font-size:14px; width: 100%; text-align: center;";
+      infoNote.innerText = "Note: Energy Units calculated as (Last Value - First Value) / 1000";
       tempDiv.appendChild(infoNote);
 
-      // 3. System Alerts (Errors)
+      // 5. System Alerts
       const alertsLabel = document.createElement("h3");
-      alertsLabel.style.marginTop = "30px";
       alertsLabel.innerText = "3. System Performance Alerts";
+      alertsLabel.style.cssText = "width: 100%; text-align: center; margin-top: 40px;";
       tempDiv.appendChild(alertsLabel);
+      
       const eventsClone = eventsArea.cloneNode(true);
+      eventsClone.style.cssText = "width: 90%; margin: 0 auto; text-align: left;"; // Alerts are better left-aligned for reading
       tempDiv.appendChild(eventsClone);
 
-      // Render Page 2
-      await new Promise((r) => setTimeout(r, 600)); 
-      const canvasMonthly = await html2canvas(tempDiv, {
-        scale: 2,
-        useCORS: true,
-      });
-      const monthlyHeight =
-        (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
+      // Capture Page 2
+      // Small delay to ensure styles render before snapshot
+      await new Promise((r) => setTimeout(r, 500)); 
+      
+      const canvasMonthly = await html2canvas(tempDiv, { scale: 2, useCORS: true });
+      const monthlyHeight = (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
 
       pdf.addPage();
-      const finalHeight =
-        monthlyHeight > pageHeight - 40 ? pageHeight - 40 : monthlyHeight;
-      pdf.addImage(
-        canvasMonthly.toDataURL("image/jpeg", 0.85),
-        "JPEG",
-        margin,
-        20,
-        maxLineWidth,
-        finalHeight
-      );
+      // Ensure the image fits within the page height
+      const finalHeight = monthlyHeight > (pageHeight - 20) ? (pageHeight - 20) : monthlyHeight;
+      pdf.addImage(canvasMonthly.toDataURL("image/jpeg", 0.85), "JPEG", margin, 10, maxLineWidth, finalHeight);
 
       document.body.removeChild(tempDiv);
     }
 
-    // ======================================================
-    // FINAL PAGE: LIFETIME STATISTICS (The New Feature)
-    // ======================================================
+    // --- PAGE 3: LIFETIME STATISTICS ---
     if (lifetimeChart && lifetimeChart.style.display !== "none") {
         pdf.addPage();
-
-        // 1. Add Header directly to PDF
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(18);
-        pdf.setTextColor(139, 92, 246); // Purple color
+        pdf.setTextColor(139, 92, 246);
         pdf.text("LIFETIME ENERGY GENERATION HISTORY", pageWidth / 2, 20, { align: "center" });
         
-        // 2. Add Subtitle/Note
         pdf.setFontSize(10);
         pdf.setFont("helvetica", "italic");
         pdf.setTextColor(100);
         pdf.text("Cumulative monthly energy totals since installation (Nov 2025)", pageWidth / 2, 27, { align: "center" });
 
-        // 3. Capture the Chart Element
-        // We capture the specific div element of the lifetime graph
-        const canvasLife = await html2canvas(lifetimeChart, { 
-            scale: 2, 
-            useCORS: true,
-            backgroundColor: "#ffffff" // Ensure white background
-        });
-        
+        const canvasLife = await html2canvas(lifetimeChart, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
         const lifeImgHeight = (maxLineWidth * canvasLife.height) / canvasLife.width;
         
-        // 4. Place Image on PDF
-        pdf.addImage(
-            canvasLife.toDataURL("image/jpeg", 0.90),
-            "JPEG",
-            margin,
-            35, // Position below header
-            maxLineWidth,
-            lifeImgHeight
-        );
+        pdf.addImage(canvasLife.toDataURL("image/jpeg", 0.90), "JPEG", margin, 35, maxLineWidth, lifeImgHeight);
     }
 
     // --- PAGE NUMBERS ---
@@ -885,9 +851,7 @@ async function downloadDashboardSection() {
       pdf.setPage(i);
       pdf.setFontSize(10);
       pdf.setTextColor(150);
-      pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, {
-        align: "center",
-      });
+      pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: "center" });
     }
 
     pdf.save(`Solar_Report_${dateValue}.pdf`);
