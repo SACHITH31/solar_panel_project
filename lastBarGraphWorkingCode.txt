@@ -4,9 +4,6 @@ const SPREADSHEET_ID = "1AdBjvpwcuAPetNtZXWR1nWwQTdbLCpslQ6xWbcPr5M0";
 const SHEET_PREFIX = "EEE Block-1 Solar Data_Slave_1_";
 const POLLING_INTERVAL = 120000;
 
-// NEW: Start Date Configuration
-const START_DATE_STR = "2025-11-22"; 
-
 let pollingTimer = null;
 let lastDataTable = null;
 const detectedEventSet = new Set();
@@ -35,15 +32,12 @@ function init() {
 
   loadData(today);
   startPolling(today);
-
-  // Trigger the new feature (Lifetime Stats)
-  // We use a small timeout so the main dashboard loads first
-  setTimeout(() => {
-    generateLifetimeGraph();
-  }, 1500);
+  // updatePermanentBarChart(today);
 
   window.addEventListener("resize", () => {
     if (lastDataTable) drawChart(lastDataTable);
+    const currentVal = document.getElementById("datePicker").value;
+    updatePermanentBarChart(currentVal);
   });
 
   document.getElementById("monthViewBtn").addEventListener("click", () => {
@@ -54,6 +48,20 @@ function init() {
   document
     .getElementById("mvOkBtn")
     .addEventListener("click", handleMonthViewRequest);
+  observePermanentChart();
+  setTimeout(() => {
+  const section = document.getElementById("persistent-energy-section");
+  if (!section) return;
+
+  const rect = section.getBoundingClientRect();
+  const isVisible = rect.top < window.innerHeight && rect.bottom >= 0;
+
+  if (isVisible && !permanentChartLoaded) {
+    permanentChartLoaded = true;
+    updatePermanentBarChart();
+  }
+}, 500);
+
 }
 
 /* ---------- DATE HANDLING ---------- */
@@ -68,12 +76,16 @@ function onDateSelect() {
     const today = getTodayDate();
     document.getElementById("datePicker").value = today;
     loadData(today);
+    updatePermanentBarChart(today); // <--- Add this
     startPolling(today);
     return;
   }
 
   clearError();
   loadData(selectedDate);
+  
+  // ADD THIS LINE HERE
+  updatePermanentBarChart(selectedDate);
 
   if (selectedDate === getTodayDate()) {
     startPolling(selectedDate);
@@ -124,10 +136,130 @@ function loadData(dateValue) {
   });
 }
 
+/* ---------- OPTIMIZED ALL-HISTORY FETCHING ---------- */
+
+async function getAllHistoryResults() {
+  const startDate = new Date("2025-11-22");
+  const today = new Date();
+  let monthPromises = [];
+
+  let currentYear = startDate.getFullYear();
+  let currentMonth = startDate.getMonth();
+
+  // Create a list of all month-fetch promises to run in parallel
+  while (currentYear < today.getFullYear() || (currentYear === today.getFullYear() && currentMonth <= today.getMonth())) {
+    monthPromises.push(getMonthlyResults(currentMonth + 1, currentYear));
+    
+    currentMonth++;
+    if (currentMonth > 11) {
+      currentMonth = 0;
+      currentYear++;
+    }
+  }
+
+  // Fetch all months simultaneously
+  const allMonthsData = await Promise.all(monthPromises);
+  
+  // Flatten the arrays into one single list of days
+  return allMonthsData.flat().filter(r => r !== null);
+}
+
+let permanentChartLoaded = false;
+
+function observePermanentChart() {
+  const section = document.getElementById("persistent-energy-section");
+
+  if (!section) return;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && !permanentChartLoaded) {
+        permanentChartLoaded = true;
+        updatePermanentBarChart();   // heavy call happens HERE
+        observer.disconnect();
+      }
+    },
+    { threshold: 0.2 }
+  );
+
+  observer.observe(section);
+}
+
+
+async function updatePermanentBarChart() {
+  const container = document.getElementById('permanent_bar_chart_div');
+
+  if (!container) {
+    setTimeout(updatePermanentBarChart, 300);
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="text-align:center;padding:40px;color:#666;">
+      📊 Generating Monthly Totals...
+    </div>
+  `;
+
+  const results = await getAllHistoryResults(); 
+
+  if (results && results.length > 0) {
+    const monthlyTotals = {};
+
+    results.forEach(item => {
+      const parts = item.label.split(" ");
+      const monthLabel = parts[1]; 
+      
+      if (!monthlyTotals[monthLabel]) {
+        monthlyTotals[monthLabel] = 0;
+      }
+      monthlyTotals[monthLabel] += item.energyKwh;
+    });
+
+    const dt = new google.visualization.DataTable();
+    dt.addColumn('string', 'Month');
+    dt.addColumn('number', 'Total Energy (kWh)');
+    
+    const rows = Object.keys(monthlyTotals).map(month => [month, monthlyTotals[month]]);
+    dt.addRows(rows);
+
+    const view = new google.visualization.DataView(dt);
+    view.setColumns([0, 1, {
+      calc: "stringify",
+      sourceColumn: 1,
+      type: "string",
+      role: "annotation"
+    }]);
+
+    const options = {
+      title: `Total Monthly Energy Yield (kWh)`,
+      colors: ['#10b981'],
+      chartArea: { width: '85%', height: '70%', bottom: '15%' },
+      hAxis: { 
+        title: 'Month',
+        gridlines: { count: 0 }
+      },
+      vAxis: { 
+        title: 'Total kWh', 
+        viewWindow: { min: 0 },
+        format: 'short' 
+      },
+      legend: { position: 'none' },
+      annotations: {
+        alwaysOutside: true,
+        textStyle: { fontSize: 12, color: '#333' }
+      }
+    };
+
+    const chart = new google.visualization.ColumnChart(container);
+    chart.draw(view, options);
+  }
+}
 /* ---------- CHART (FIXED ANNOTATIONS) ---------- */
 function drawChart(data) {
+  // Ensure we don't duplicate columns if redrawing
   let view = new google.visualization.DataView(data);
 
+  // Logic to add annotation columns to the underlying data if they don't exist
   if (data.getNumberOfColumns() < 11) {
     data.addColumn({ type: "string", role: "annotation" });
     data.addColumn({ type: "string", role: "annotationText" });
@@ -172,11 +304,66 @@ function drawChart(data) {
   });
 }
 
-/* ---------- FAST MONTH VIEW (EXISTING) ---------- */
+function getHistoryCacheKey(month, year) {
+  return `solar_history_${year}_${month}`;
+}
+
+
+/* ---------- FAST MONTH VIEW (FIXED SPEED & GHOST DATA) ---------- */
+/* ---------- DATA FETCHING HELPER ---------- */
+async function getMonthlyResults(month, year) {
+  const cacheKey = getHistoryCacheKey(month, year);
+const cached = localStorage.getItem(cacheKey);
+
+if (cached) {
+  return JSON.parse(cached);
+}
+  const today = new Date();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const maxDay = (today.getMonth() + 1 === month && today.getFullYear() === year) 
+                 ? today.getDate() : daysInMonth;
+
+  const dayPromises = [];
+  for (let d = 1; d <= maxDay; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const sheetName = SHEET_PREFIX + dateStr;
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&range=AA:AA`;
+
+    dayPromises.push(
+      fetch(url)
+        .then(res => res.text())
+        .then(text => {
+          const rows = text.split("\n").filter(row => row.trim() !== "").slice(1);
+          if (rows.length < 2) return null;
+
+          const firstRowCols = rows[0].split(",");
+          const lastRowCols = rows[rows.length - 1].split(",");
+          
+          // Column AA is index 26
+          const firstWh = parseFloat(firstRowCols[0]?.replace(/"/g, ""));
+          const lastWh  = parseFloat(lastRowCols[0]?.replace(/"/g, ""));
+
+
+          return {
+            label: `${d} ${new Date(year, month - 1).toLocaleString("en", { month: "short" })}`,
+            energyKwh: (!isNaN(firstWh) && !isNaN(lastWh)) ? (lastWh - firstWh) / 1000 : 0,
+            value: 0, // Placeholder for peak power if needed later
+            dayNum: d
+          };
+        }).catch(() => null)
+    );
+  }
+  const finalResults = await Promise.all(dayPromises);
+  localStorage.setItem(cacheKey, JSON.stringify(finalResults));
+  return finalResults.filter(r => r !== null).sort((a, b) => a.dayNum - b.dayNum);
+}
+
 async function handleMonthViewRequest() {
   const loader = document.getElementById("monthLoader");
   const mainContainer = document.getElementById("monthlyBarChartContainer");
-  const energyContainer = document.getElementById("monthlyEnergyChartContainer");
+  const energyContainer = document.getElementById(
+    "monthlyEnergyChartContainer"
+  );
   const oopsMsg = document.getElementById("oopsMessage");
 
   if (oopsMsg) oopsMsg.style.display = "none";
@@ -199,7 +386,68 @@ async function handleMonthViewRequest() {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(
       d
     ).padStart(2, "0")}`;
-    dayPromises.push(fetchDailyEnergyStats(dateStr, d));
+    const sheetName = SHEET_PREFIX + dateStr;
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+      sheetName
+    )}`;
+
+    dayPromises.push(
+      fetch(url)
+        .then((res) => res.text())
+        .then((text) => {
+          if (!text.includes(dateStr)) return null;
+
+          const rows = text
+            .split("\n")
+            .filter((row) => row.trim() !== "")
+            .slice(1);
+          if (rows.length < 2) return null;
+
+          // --- DEBUG PRINTING START ---
+          const firstRowCols = rows[0].split(",");
+          const lastRowCols = rows[rows.length - 1].split(",");
+
+          // Column AA is index 7 (0=A, 1=B, 2=C... 7=H? No, AA is index 26)
+          // WAIT: If Column AA is actually index 26, that might be the bug!
+          // Let's print the whole row to be sure.
+
+          const firstWhRaw = firstRowCols[26]?.replace(/"/g, "");
+          const lastWhRaw = lastRowCols[26]?.replace(/"/g, "");
+
+          console.log(`--- Data for ${dateStr} ---`);
+          console.log(`First Value in Col AA: ${firstWhRaw}`);
+          console.log(`Last Value in Col AA: ${lastWhRaw}`);
+          // --- DEBUG PRINTING END ---
+
+          const firstWh = parseFloat(firstWhRaw);
+          const lastWh = parseFloat(lastWhRaw);
+
+          let energyCalcKwh = 0;
+          if (!isNaN(firstWh) && !isNaN(lastWh)) {
+            energyCalcKwh = (lastWh - firstWh) / 1000;
+            console.log(
+              `Resulting Calculation: (${lastWh} - ${firstWh}) / 1000 = ${energyCalcKwh} kWh`
+            );
+          }
+
+          let dailyMaxPower = 0;
+          rows.forEach((row) => {
+            const cols = row.split(",");
+            const p = parseFloat(cols[1]?.replace(/"/g, ""));
+            if (!isNaN(p) && p > dailyMaxPower) dailyMaxPower = p;
+          });
+
+          return {
+            label: `${d} ${new Date(year, month - 1).toLocaleString("en", {
+              month: "short",
+            })}`,
+            value: dailyMaxPower,
+            energyKwh: energyCalcKwh,
+            dayNum: d,
+          };
+        })
+        .catch(() => null)
+    );
   }
 
   const results = (await Promise.all(dayPromises))
@@ -219,66 +467,6 @@ async function handleMonthViewRequest() {
   drawMonthlyMaxBarChart(results, month, year);
   drawMonthlyEnergyBarChart(results, month, year);
 }
-
-// Extracted this logic to be reusable for the new feature
-function fetchDailyEnergyStats(dateStr, dayNum) {
-  const sheetName = SHEET_PREFIX + dateStr;
-  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
-    sheetName
-  )}`;
-
-  return fetch(url)
-    .then((res) => res.text())
-    .then((text) => {
-      if (!text.includes(dateStr)) return null;
-
-      const rows = text
-        .split("\n")
-        .filter((row) => row.trim() !== "")
-        .slice(1);
-      if (rows.length < 2) return null;
-
-      // Col AA is index 26
-      const firstRowCols = rows[0].split(",");
-      const lastRowCols = rows[rows.length - 1].split(",");
-
-      const firstWhRaw = firstRowCols[26]?.replace(/"/g, "");
-      const lastWhRaw = lastRowCols[26]?.replace(/"/g, "");
-
-      const firstWh = parseFloat(firstWhRaw);
-      const lastWh = parseFloat(lastWhRaw);
-
-      let energyCalcKwh = 0;
-      if (!isNaN(firstWh) && !isNaN(lastWh)) {
-        energyCalcKwh = (lastWh - firstWh) / 1000;
-        
-        // --- DEBUG CONSOLE LOG FOR USER CONFIRMATION ---
-        console.log(`📝 [${dateStr}] First Value (AA): ${firstWh} | Last Value (AA): ${lastWh} | Result: (${lastWh} - ${firstWh}) / 1000 = ${energyCalcKwh.toFixed(4)} kWh`);
-        // -----------------------------------------------
-      }
-
-      let dailyMaxPower = 0;
-      rows.forEach((row) => {
-        const cols = row.split(",");
-        const p = parseFloat(cols[1]?.replace(/"/g, ""));
-        if (!isNaN(p) && p > dailyMaxPower) dailyMaxPower = p;
-      });
-
-      // Getting month/year from dateStr
-      const dDate = new Date(dateStr);
-      const label = `${dDate.getDate()} ${dDate.toLocaleString("en", { month: "short" })}`;
-
-      return {
-        label: label,
-        value: dailyMaxPower,
-        energyKwh: energyCalcKwh,
-        dayNum: dayNum || dDate.getDate(),
-      };
-    })
-    .catch(() => null);
-}
-
-
 function drawMonthlyEnergyBarChart(dataArr, month, year) {
   const chartDiv = document.getElementById("monthlyEnergyChart");
   const dt = new google.visualization.DataTable();
@@ -292,9 +480,25 @@ function drawMonthlyEnergyBarChart(dataArr, month, year) {
     legend: "none",
     height: 450,
     colors: ["#10b981"],
-    chartArea: { left: "12%", right: "8%", top: "15%", bottom: "25%", width: "80%" },
-    hAxis: { title: "Date", slantedText: true, slantedTextAngle: 45, showTextEvery: 1 },
-    vAxis: { title: "Units / kWh", minValue: 0, format: "#.##", viewWindow: { min: 0 } },
+    chartArea: {
+      left: "12%",
+      right: "8%",
+      top: "15%",
+      bottom: "25%",
+      width: "80%",
+    },
+    hAxis: {
+      title: "Date",
+      slantedText: true,
+      slantedTextAngle: 45,
+      showTextEvery: 1, // This ensures every date label is shown on the X-axis
+    },
+    vAxis: {
+      title: "Units / kWh", // Updated label as requested
+      minValue: 0,
+      format: "#.##",
+      viewWindow: { min: 0 },
+    },
     bar: { groupWidth: "75%" },
   };
 
@@ -312,12 +516,16 @@ function drawMonthlyMaxBarChart(dataArr, month, year) {
     return;
   }
 
+  // Reveal the container
   oopsMsg.style.display = "none";
   container.style.display = "block";
 
+  // Create the DataTable manually from the array objects {label, value}
   const dt = new google.visualization.DataTable();
   dt.addColumn("string", "Date");
   dt.addColumn("number", "Peak Watts");
+
+  // Convert the dataArr into rows Google can read
   const rows = dataArr.map((item) => [item.label, item.value]);
   dt.addRows(rows);
 
@@ -325,9 +533,28 @@ function drawMonthlyMaxBarChart(dataArr, month, year) {
     title: `Daily Peak Power Generation - ${month}/${year}`,
     legend: "none",
     height: 500,
-    chartArea: { left: "10%", right: "10%", top: "15%", bottom: "20%", width: "80%", height: "65%" },
-    hAxis: { title: "Date", slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: 11 } },
-    vAxis: { title: "Watts", minValue: 0, gridlines: { count: 6 }, format: "short" },
+    // Adjust these percentages to bring the graph inward
+    chartArea: {
+      left: "10%", // Gives more room for the Y-axis numbers
+      right: "10%", // FIX: Prevents the "8 Jan" bar from hitting the right edge
+      top: "15%", // Room for the title
+      bottom: "20%", // Room for rotated date labels
+      width: "80%", // Restricts total width to 80% of container
+      height: "65%",
+    },
+    hAxis: {
+      title: "Date",
+      slantedText: true,
+      slantedTextAngle: 45,
+      textStyle: { fontSize: 11 },
+    },
+    vAxis: {
+      title: "Watts",
+      minValue: 0,
+      gridlines: { count: 6 },
+      // This helps format large numbers so they don't take up too much horizontal space
+      format: "short",
+    },
     bar: { groupWidth: "75%" },
     colors: ["#1a73e8"],
   };
@@ -347,122 +574,7 @@ function populateMonthViewYears() {
   }
 }
 
-/* ---------- NEW FEATURE: LIFETIME MONTHLY DATA ---------- */
-
-async function generateLifetimeGraph() {
-  const loader = document.getElementById('lifetimeLoader');
-  const statusText = document.getElementById('lifetimeStatusText');
-  const chartDiv = document.getElementById('lifetimeChartDiv');
-
-  loader.style.display = 'block';
-  chartDiv.style.display = 'none';
-
-  const startDate = new Date(START_DATE_STR);
-  const today = new Date();
-  
-  // We need to loop from Start Date Month to Current Month
-  let currentIterDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-  const monthList = [];
-
-  while (currentIterDate <= today) {
-    monthList.push({
-      month: currentIterDate.getMonth() + 1,
-      year: currentIterDate.getFullYear()
-    });
-    // Move to next month
-    currentIterDate.setMonth(currentIterDate.getMonth() + 1);
-  }
-
-  const monthlyTotals = [];
-
-  // Process each month sequentially
-  for (const mData of monthList) {
-    statusText.innerText = `Calculating data for ${mData.month}/${mData.year}...`;
-    
-    // Calculate start and end day for this specific month
-    let startDay = 1;
-    if (mData.month === (startDate.getMonth() + 1) && mData.year === startDate.getFullYear()) {
-      startDay = startDate.getDate();
-    }
-
-    let endDay = new Date(mData.year, mData.month, 0).getDate();
-    if (mData.month === (today.getMonth() + 1) && mData.year === today.getFullYear()) {
-      endDay = today.getDate();
-    }
-
-    const dayPromises = [];
-    for (let d = startDay; d <= endDay; d++) {
-        const dateStr = `${mData.year}-${String(mData.month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-        dayPromises.push(fetchDailyEnergyStats(dateStr, d));
-    }
-
-    const dayResults = await Promise.all(dayPromises);
-    
-    let monthSum = 0;
-    dayResults.forEach(res => {
-        if(res && res.energyKwh) {
-            monthSum += res.energyKwh;
-        }
-    });
-    
-    // --- DEBUG CONSOLE LOG FOR USER CONFIRMATION ---
-    const monthName = new Date(mData.year, mData.month - 1).toLocaleString('default', { month: 'long' });
-    console.log(`✅ >>> TOTAL FOR ${monthName} ${mData.year}: ${monthSum.toFixed(4)} kWh <<<`);
-    console.log("---------------------------------------------------------------");
-    // -----------------------------------------------
-
-    monthlyTotals.push({
-        label: `${monthName.substring(0,3)} ${mData.year}`,
-        value: monthSum
-    });
-  }
-
-  // All Done
-  loader.style.display = 'none';
-  chartDiv.style.display = 'block';
-  drawLifetimeChart(monthlyTotals);
-}
-
-function drawLifetimeChart(dataArr) {
-    const chartDiv = document.getElementById('lifetimeChartDiv');
-    const dt = new google.visualization.DataTable();
-    dt.addColumn('string', 'Month');
-    dt.addColumn('number', 'Total Generated (kWh)');
-    dt.addColumn({ type: 'number', role: 'annotation' }); 
-
-    const rows = dataArr.map(item => [
-        item.label, 
-        item.value, 
-        parseFloat(item.value.toFixed(1)) 
-    ]);
-    
-    dt.addRows(rows);
-
-    const options = {
-        title: 'Total Energy Generated per Month (Cumulative)',
-        legend: { position: 'none' },
-        colors: ['#8b5cf6'],
-        bar: { groupWidth: '60%' },
-        vAxis: { 
-            title: 'Energy (kWh)',
-            minValue: 0
-        },
-        hAxis: {
-            title: 'Month'
-        },
-        chartArea: { width: '85%', height: '70%' },
-        animation: {
-          startup: true,
-          duration: 1000,
-          easing: 'out',
-        }
-    };
-
-    const chart = new google.visualization.ColumnChart(chartDiv);
-    chart.draw(dt, options);
-}
-
-/* ---------- SUMMARY & METRICS (EXISTING) ---------- */
+/* ---------- SUMMARY & METRICS ---------- */
 function showLiveWatt(data) {
   const last = data.getNumberOfRows() - 1;
   const watt = (data.getValue(last, 1) / 1000).toFixed(2);
@@ -673,12 +785,12 @@ async function downloadDashboardSection() {
 
     // --- PAGE 1: DAILY DASHBOARD ---
     if (!isMonthlyActive) {
-      const eventsClone = eventsArea.cloneNode(true);
-      eventsClone.style.marginTop = "20px";
-      mainArea.appendChild(eventsClone);
-
+      // const eventsClone = eventsArea.cloneNode(true);
+      // eventsClone.style.marginTop = "20px";
+      // mainArea.appendChild(eventsClone);
+      await new Promise((r) => setTimeout(r, 800));
       const canvas = await html2canvas(mainArea, { scale: 2, useCORS: true });
-      mainArea.removeChild(eventsClone);
+      // mainArea.removeChild(eventsClone);
 
       addPdfHeader(pdf, dateValue, margin);
       const imgHeight = (maxLineWidth * canvas.height) / canvas.width;
