@@ -696,12 +696,15 @@ function closeMonthPopup() {
   document.getElementById("monthViewPopup").style.display = "none";
 }
 
+/* REPLACE THIS FUNCTION IN script.js */
+
 async function downloadDashboardSection() {
   const btn = document.getElementById("downloadBtn");
   const btnText = document.getElementById("btnText");
   const mainArea = document.getElementById("download-area");
   const eventsArea = document.getElementById("events");
   const monthlyContainer = document.getElementById("monthlyBarChartContainer");
+  const lifetimeChart = document.getElementById("lifetimeChartDiv"); // NEW: Get Lifetime Chart
   const mvMonth = document.getElementById("mvMonth");
   const mvYear = document.getElementById("mvYear");
   const dateValue = document.getElementById("datePicker").value;
@@ -720,8 +723,12 @@ async function downloadDashboardSection() {
     const isMonthlyActive =
       monthlyContainer && monthlyContainer.style.display !== "none";
 
-    // --- PAGE 1: DAILY DASHBOARD ---
+    // ======================================================
+    // PAGE 1: DAILY DASHBOARD (or Monthly View Page 1)
+    // ======================================================
     if (!isMonthlyActive) {
+      // --- SCENARIO A: NORMAL DAILY VIEW ---
+      // We attach events temporarily to the main area to capture them on Page 1 (or 2 if long)
       const eventsClone = eventsArea.cloneNode(true);
       eventsClone.style.marginTop = "20px";
       mainArea.appendChild(eventsClone);
@@ -731,6 +738,8 @@ async function downloadDashboardSection() {
 
       addPdfHeader(pdf, dateValue, margin);
       const imgHeight = (maxLineWidth * canvas.height) / canvas.width;
+      
+      // If daily view is very long, it might need scaling, but usually fits on P1
       pdf.addImage(
         canvas.toDataURL("image/jpeg", 0.85),
         "JPEG",
@@ -740,7 +749,8 @@ async function downloadDashboardSection() {
         imgHeight
       );
     } else {
-      // --- PAGE 1: CURRENT VIEW ---
+      // --- SCENARIO B: MONTHLY VIEW ACTIVE ---
+      // Page 1: Just the Main Dashboard (Watts/Live data)
       const canvasMain = await html2canvas(mainArea, {
         scale: 2,
         useCORS: true,
@@ -756,9 +766,8 @@ async function downloadDashboardSection() {
         mainHeight
       );
 
-      // --- PAGE 2: MONTHLY OVERVIEW (Both Graphs) ---
+      // Page 2: Monthly Graphs + Error Messages
       const tempDiv = document.createElement("div");
-      // Fixed width for high-quality capture
       tempDiv.style.cssText =
         "background:#fff; padding:30px; width:1000px; position:absolute; left:-9999px;";
       document.body.appendChild(tempDiv);
@@ -771,7 +780,7 @@ async function downloadDashboardSection() {
       } Monthly Report`;
       tempDiv.appendChild(heading);
 
-      // 1. Add Peak Power Chart Clone
+      // 1. Peak Power Chart
       const powerLabel = document.createElement("h3");
       powerLabel.innerText = "1. Daily Peak Power Generation (Watts)";
       tempDiv.appendChild(powerLabel);
@@ -781,7 +790,7 @@ async function downloadDashboardSection() {
       chart1Clone.style.width = "100%";
       tempDiv.appendChild(chart1Clone);
 
-      // 2. Add Energy Units Chart Clone
+      // 2. Energy Units Chart
       const energyLabel = document.createElement("h3");
       energyLabel.style.marginTop = "30px";
       energyLabel.innerText = "2. Daily Total Energy (Units / kWh)";
@@ -792,7 +801,6 @@ async function downloadDashboardSection() {
       chart2Clone.style.width = "100%";
       tempDiv.appendChild(chart2Clone);
 
-      // 3. Add Formula/Info Note
       const infoNote = document.createElement("div");
       infoNote.style.cssText =
         "margin-top:10px; font-style:italic; color:#666; font-size:14px;";
@@ -800,7 +808,7 @@ async function downloadDashboardSection() {
         "Note: Energy Units calculated as (Last Value - First Value) / 1000";
       tempDiv.appendChild(infoNote);
 
-      // 4. Add System Alerts
+      // 3. System Alerts (Errors)
       const alertsLabel = document.createElement("h3");
       alertsLabel.style.marginTop = "30px";
       alertsLabel.innerText = "3. System Performance Alerts";
@@ -808,8 +816,8 @@ async function downloadDashboardSection() {
       const eventsClone = eventsArea.cloneNode(true);
       tempDiv.appendChild(eventsClone);
 
-      // Render to PDF
-      await new Promise((r) => setTimeout(r, 600)); // Buffer for rendering
+      // Render Page 2
+      await new Promise((r) => setTimeout(r, 600)); 
       const canvasMonthly = await html2canvas(tempDiv, {
         scale: 2,
         useCORS: true,
@@ -818,7 +826,6 @@ async function downloadDashboardSection() {
         (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
 
       pdf.addPage();
-      // If content is too long for one page, we scale it to fit A4
       const finalHeight =
         monthlyHeight > pageHeight - 40 ? pageHeight - 40 : monthlyHeight;
       pdf.addImage(
@@ -831,6 +838,45 @@ async function downloadDashboardSection() {
       );
 
       document.body.removeChild(tempDiv);
+    }
+
+    // ======================================================
+    // FINAL PAGE: LIFETIME STATISTICS (The New Feature)
+    // ======================================================
+    if (lifetimeChart && lifetimeChart.style.display !== "none") {
+        pdf.addPage();
+
+        // 1. Add Header directly to PDF
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(18);
+        pdf.setTextColor(139, 92, 246); // Purple color
+        pdf.text("LIFETIME ENERGY GENERATION HISTORY", pageWidth / 2, 20, { align: "center" });
+        
+        // 2. Add Subtitle/Note
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "italic");
+        pdf.setTextColor(100);
+        pdf.text("Cumulative monthly energy totals since installation (Nov 2025)", pageWidth / 2, 27, { align: "center" });
+
+        // 3. Capture the Chart Element
+        // We capture the specific div element of the lifetime graph
+        const canvasLife = await html2canvas(lifetimeChart, { 
+            scale: 2, 
+            useCORS: true,
+            backgroundColor: "#ffffff" // Ensure white background
+        });
+        
+        const lifeImgHeight = (maxLineWidth * canvasLife.height) / canvasLife.width;
+        
+        // 4. Place Image on PDF
+        pdf.addImage(
+            canvasLife.toDataURL("image/jpeg", 0.90),
+            "JPEG",
+            margin,
+            35, // Position below header
+            maxLineWidth,
+            lifeImgHeight
+        );
     }
 
     // --- PAGE NUMBERS ---
