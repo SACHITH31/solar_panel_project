@@ -715,7 +715,7 @@ async function downloadDashboardSection() {
   try {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageWidth = pdf.internal.pageSize.getWidth(); // ~210mm
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
@@ -724,14 +724,11 @@ async function downloadDashboardSection() {
 
     // --- PAGE 1: DAILY DASHBOARD ---
     if (!isMonthlyActive) {
-      // Daily View Logic
       const eventsClone = eventsArea.cloneNode(true);
       eventsClone.style.marginTop = "20px";
       mainArea.appendChild(eventsClone);
-
       const canvas = await html2canvas(mainArea, { scale: 2, useCORS: true });
       mainArea.removeChild(eventsClone);
-
       addPdfHeader(pdf, dateValue, margin);
       const imgHeight = (maxLineWidth * canvas.height) / canvas.width;
       pdf.addImage(canvas.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, imgHeight);
@@ -743,85 +740,98 @@ async function downloadDashboardSection() {
       pdf.addImage(canvasMain.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, mainHeight);
 
       // =========================================================
-      // PAGE 2: MONTHLY GRAPHS (CENTERING FIX)
+      // PAGE 2: FIX - FORCE CENTER & BIG SIZE (PHONE FRIENDLY)
       // =========================================================
       
-      // 1. Create a temporary container that forces centering
       const tempDiv = document.createElement("div");
+      
+      // 1. Force a huge desktop-size container (1200px)
+      // 2. Use Flexbox to align everything to the Center
       tempDiv.style.cssText = `
-        background: #ffffff; 
-        padding: 40px; 
-        width: 1100px; /* Fixed wide width ensures high quality on phone */
-        position: absolute; 
+        position: fixed; 
         left: -9999px; 
         top: 0;
+        width: 1200px !important;
+        background: #ffffff; 
+        padding: 40px; 
         display: flex;
         flex-direction: column;
-        align-items: center; /* THIS CENTERS THE GRAPHS */
-        justify-content: center;
-        text-align: center;
+        align-items: center;  /* <--- KEY: Center Horizontally */
+        justify-content: flex-start;
       `;
       document.body.appendChild(tempDiv);
 
-      // 2. Add Main Title
+      // --- Header ---
       const heading = document.createElement("div");
-      heading.style.cssText = "font-size:32px; font-weight:bold; color:#1a73e8; margin-bottom:10px; text-transform: uppercase; width: 100%; text-align: center;";
+      heading.style.cssText = "font-size:36px; font-weight:bold; color:#1a73e8; margin-bottom:10px; text-transform:uppercase; text-align:center; width:100%;";
       heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} MONTHLY REPORT`;
       tempDiv.appendChild(heading);
 
       const subHeading = document.createElement("div");
-      subHeading.style.cssText = "font-size:16px; font-style:italic; color:#666; margin-bottom:40px; width: 100%; text-align: center;";
+      subHeading.style.cssText = "font-size:18px; font-style:italic; color:#666; margin-bottom:30px; text-align:center; width:100%;";
       subHeading.innerText = "Detailed daily breakdown of Power and Energy";
       tempDiv.appendChild(subHeading);
 
-      // 3. Peak Power Chart
+      // --- 1. Peak Power Chart ---
       const powerLabel = document.createElement("h3");
       powerLabel.innerText = "1. Daily Peak Power Generation (Watts)";
-      powerLabel.style.cssText = "width: 100%; text-align: center; margin-top: 20px;";
+      powerLabel.style.cssText = "width:100%; text-align:left; font-size:24px; color:#333; margin-top:20px; font-weight:bold;";
       tempDiv.appendChild(powerLabel);
       
       const chart1Clone = document.getElementById("monthlyBarChart").cloneNode(true);
-      // FORCE CENTERING ON THE GRAPH ITSELF
-      chart1Clone.style.cssText = "width: 85% !important; margin: 0 auto !important; display: block;";
+      
+      // CRITICAL FIX: Force the DIV to be 1000px and Center it with margin auto
+      chart1Clone.style.cssText = "width: 1000px !important; display: flex; flex-direction: column; align-items: center;";
+      
+      // CRITICAL FIX: Force the internal CANVAS to stretch
+      const canvas1 = chart1Clone.querySelector('canvas');
+      if(canvas1) {
+          canvas1.style.cssText = "width: 100% !important; height: auto !important;";
+      }
       tempDiv.appendChild(chart1Clone);
 
-      // 4. Energy Units Chart
+      // --- 2. Energy Units Chart ---
       const energyLabel = document.createElement("h3");
       energyLabel.innerText = "2. Daily Total Energy (Units / kWh)";
-      energyLabel.style.cssText = "width: 100%; text-align: center; margin-top: 40px;";
+      energyLabel.style.cssText = "width:100%; text-align:left; font-size:24px; color:#333; margin-top:40px; font-weight:bold;";
       tempDiv.appendChild(energyLabel);
       
       const chart2Clone = document.getElementById("monthlyEnergyChart").cloneNode(true);
-      // FORCE CENTERING ON THE GRAPH ITSELF
-      chart2Clone.style.cssText = "width: 85% !important; margin: 0 auto !important; display: block;";
+      
+      // CRITICAL FIX: Force Width & Center
+      chart2Clone.style.cssText = "width: 1000px !important;  display: flex; flex-direction: column; align-items: center;";
+      
+      const canvas2 = chart2Clone.querySelector('canvas');
+      if(canvas2) {
+          canvas2.style.cssText = "width: 100% !important; height: auto !important;";
+      }
       tempDiv.appendChild(chart2Clone);
 
       const infoNote = document.createElement("div");
-      infoNote.style.cssText = "margin-top:10px; font-style:italic; color:#666; font-size:14px; width: 100%; text-align: center;";
+      infoNote.style.cssText = "margin-top:10px; font-style:italic; color:#666; font-size:16px; width:100%; text-align:center;";
       infoNote.innerText = "Note: Energy Units calculated as (Last Value - First Value) / 1000";
       tempDiv.appendChild(infoNote);
 
-      // 5. System Alerts
+      // --- 3. System Alerts ---
       const alertsLabel = document.createElement("h3");
       alertsLabel.innerText = "3. System Performance Alerts";
-      alertsLabel.style.cssText = "width: 100%; text-align: center; margin-top: 40px;";
+      alertsLabel.style.cssText = "width:100%; text-align:center; font-size:24px; color:#333; margin-top:40px; font-weight:bold;";
       tempDiv.appendChild(alertsLabel);
       
       const eventsClone = eventsArea.cloneNode(true);
-      eventsClone.style.cssText = "width: 90%; margin: 0 auto; text-align: left;"; // Alerts are better left-aligned for reading
+      eventsClone.style.cssText = "width:90%; margin: 0 auto; font-size:16px; border:1px solid #eee; padding:20px;";
       tempDiv.appendChild(eventsClone);
 
-      // Capture Page 2
-      // Small delay to ensure styles render before snapshot
-      await new Promise((r) => setTimeout(r, 500)); 
+      // Wait for rendering
+      await new Promise((r) => setTimeout(r, 800)); 
       
       const canvasMonthly = await html2canvas(tempDiv, { scale: 2, useCORS: true });
       const monthlyHeight = (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
 
       pdf.addPage();
-      // Ensure the image fits within the page height
+      // Ensure it fits the page
       const finalHeight = monthlyHeight > (pageHeight - 20) ? (pageHeight - 20) : monthlyHeight;
-      pdf.addImage(canvasMonthly.toDataURL("image/jpeg", 0.85), "JPEG", margin, 10, maxLineWidth, finalHeight);
+      pdf.addImage(canvasMonthly.toDataURL("image/jpeg", 0.90), "JPEG", margin, 15, maxLineWidth, finalHeight);
 
       document.body.removeChild(tempDiv);
     }
