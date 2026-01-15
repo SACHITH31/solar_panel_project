@@ -161,7 +161,7 @@ function drawChart(data) {
     legend: "none",
     curveType: "function",
     lineWidth: 3,
-    chartArea: { left: 80, top: 50, width: "85%", height: "75%" },
+    chartArea: { left: 80, top: 30, width: "85%", height: "75%" },
     hAxis: { title: "Time", format: "HH:mm" },
     vAxis: { title: "Generated Power (Watts)", viewWindow: { min: 0 } },
     annotations: {
