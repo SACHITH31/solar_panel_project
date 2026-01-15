@@ -373,7 +373,7 @@ function drawMonthlyMaxBarChart(dataArr, month, year) {
   const options = {
     title: `Daily Peak Power Generation - ${month}/${year}`,
     legend: "none",
-    height: 500,
+    height: 400,
     chartArea: { left: "10%", right: "10%", top: "15%", bottom: "20%", width: "80%", height: "65%" },
     hAxis: { title: "Date", slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: 11 } },
     vAxis: { title: "Watts", minValue: 0, gridlines: { count: 6 }, format: "short" },
@@ -709,134 +709,175 @@ async function downloadDashboardSection() {
   const mvYear = document.getElementById("mvYear");
   const dateValue = document.getElementById("datePicker").value;
 
+  // --- DEVICE DETECTION ---
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
   btn.disabled = true;
   btnText.innerHTML = `<span class="spinner"></span> Capturing Report...`;
 
   try {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth(); // ~210mm
+    const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
 
     const isMonthlyActive = monthlyContainer && monthlyContainer.style.display !== "none";
 
-    // --- PAGE 1: DAILY DASHBOARD ---
-    if (!isMonthlyActive) {
-      const eventsClone = eventsArea.cloneNode(true);
-      eventsClone.style.marginTop = "20px";
-      mainArea.appendChild(eventsClone);
-      const canvas = await html2canvas(mainArea, { scale: 2, useCORS: true });
-      mainArea.removeChild(eventsClone);
-      addPdfHeader(pdf, dateValue, margin);
-      const imgHeight = (maxLineWidth * canvas.height) / canvas.width;
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, imgHeight);
-    } else {
-      // --- PAGE 1 (Monthly View Active) ---
-      const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
-      addPdfHeader(pdf, dateValue, margin);
-      const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
-      pdf.addImage(canvasMain.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, mainHeight);
+    // --- PAGE 1: DAILY DASHBOARD (Common for both) ---
+    const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
+    addPdfHeader(pdf, dateValue, margin);
+    const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
+    pdf.addImage(canvasMain.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, mainHeight);
 
-      // =========================================================
-      // PAGE 2: FIX - FORCE CENTER & BIG SIZE (PHONE FRIENDLY)
-      // =========================================================
-      
-      const tempDiv = document.createElement("div");
-      
-      // 1. Force a huge desktop-size container (1200px)
-      // 2. Use Flexbox to align everything to the Center
-      tempDiv.style.cssText = `
-        position: fixed; 
-        left: -9999px; 
-        top: 0;
-        width: 1200px !important;
-        background: #ffffff; 
-        padding: 40px; 
-        display: flex;
-        flex-direction: column;
-        align-items: center;  /* <--- KEY: Center Horizontally */
-        justify-content: flex-start;
-      `;
-      document.body.appendChild(tempDiv);
+    if (isMonthlyActive) {
+      if (isMobile) {
+        // =========================================================
+        // MOBILE LOGIC: Split into Page 2 and Page 3
+        // =========================================================
+        
+        // --- MOBILE PAGE 2: POWER CHART ---
+        const page2Div = document.createElement("div");
+        page2Div.style.cssText = "position:fixed; left:-9999px; width:1000px; padding:40px; background:#fff; display:flex; flex-direction:column; align-items:center;";
+        document.body.appendChild(page2Div);
+        
+        const h1 = document.createElement("div");
+        h1.style.cssText = "font-size:36px; font-weight:bold; color:#1a73e8; margin-bottom:10px; text-align:center; width:100%;";
+        h1.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} MONTHLY REPORT`;
+        page2Div.appendChild(h1);
 
-      // --- Header ---
-      const heading = document.createElement("div");
-      heading.style.cssText = "font-size:36px; font-weight:bold; color:#1a73e8; margin-bottom:10px; text-transform:uppercase; text-align:center; width:100%;";
-      heading.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} MONTHLY REPORT`;
-      tempDiv.appendChild(heading);
+        const p1Label = document.createElement("div");
+        p1Label.innerText = "1. Daily Peak Power Generation (Watts)";
+        p1Label.style.cssText = "width:100%; font-size:26px; font-weight:bold; color:#333; margin:20px 0;";
+        page2Div.appendChild(p1Label);
 
-      const subHeading = document.createElement("div");
-      subHeading.style.cssText = "font-size:18px; font-style:italic; color:#666; margin-bottom:30px; text-align:center; width:100%;";
-      subHeading.innerText = "Detailed daily breakdown of Power and Energy";
-      tempDiv.appendChild(subHeading);
+        const source1 = document.getElementById("monthlyBarChart");
+        if (source1) {
+            const c1 = await html2canvas(source1, { scale: 2 });
+            const img1 = document.createElement("img");
+            img1.src = c1.toDataURL("image/png");
+            img1.style.cssText = "width:100%; height:auto; margin-bottom:20px;";
+            page2Div.appendChild(img1);
+        }
+        await new Promise(r => setTimeout(r, 200));
+        const canv2 = await html2canvas(page2Div, { scale: 2 });
+        pdf.addPage();
+        pdf.addImage(canv2.toDataURL("image/jpeg", 0.95), "JPEG", margin, 15, maxLineWidth, (maxLineWidth * canv2.height) / canv2.width);
+        document.body.removeChild(page2Div);
 
-      // --- 1. Peak Power Chart ---
-      const powerLabel = document.createElement("h3");
-      powerLabel.innerText = "1. Daily Peak Power Generation (Watts)";
-      powerLabel.style.cssText = "width:100%; text-align:left; font-size:24px; color:#333; margin-top:20px; font-weight:bold;";
-      tempDiv.appendChild(powerLabel);
-      
-      const chart1Clone = document.getElementById("monthlyBarChart").cloneNode(true);
-      
-      // CRITICAL FIX: Force the DIV to be 1000px and Center it with margin auto
-      chart1Clone.style.cssText = "width: 1000px !important; display: flex; flex-direction: column; align-items: center;";
-      
-      // CRITICAL FIX: Force the internal CANVAS to stretch
-      const canvas1 = chart1Clone.querySelector('canvas');
-      if(canvas1) {
-          canvas1.style.cssText = "width: 100% !important; height: auto !important;";
+        // --- MOBILE PAGE 3: ENERGY CHART & ALERTS ---
+        const page3Div = document.createElement("div");
+        page3Div.style.cssText = "position:fixed; left:-9999px; width:1000px; padding:40px; background:#fff; display:flex; flex-direction:column; align-items:center;";
+        document.body.appendChild(page3Div);
+
+        const p2Label = document.createElement("div");
+        p2Label.innerText = "2. Daily Total Energy (Units / kWh)";
+        p2Label.style.cssText = "width:100%; font-size:26px; font-weight:bold; color:#333; margin-bottom:20px;";
+        page3Div.appendChild(p2Label);
+
+        const source2 = document.getElementById("monthlyEnergyChart");
+        if (source2) {
+            const c2 = await html2canvas(source2, { scale: 2 });
+            const img2 = document.createElement("img");
+            img2.src = c2.toDataURL("image/png");
+            img2.style.cssText = "width:100%; height:auto;";
+            page3Div.appendChild(img2);
+        }
+        const note = document.createElement("div");
+        note.style.cssText = "font-size:18px; color:#666; font-style:italic; margin:20px 0; text-align:center; width:100%;";
+        note.innerText = "Note: Energy Units calculated as (Last Value - First Value) / 1000";
+        page3Div.appendChild(note);
+
+        const alertsLabel = document.createElement("div");
+        alertsLabel.innerText = "3. System Performance Alerts";
+        alertsLabel.style.cssText = "width:100%; font-size:26px; font-weight:bold; color:#333; margin-top:20px; text-align:center;";
+        page3Div.appendChild(alertsLabel);
+
+        const evClone = eventsArea.cloneNode(true);
+        evClone.style.cssText = "width:100%; font-size:20px; border:1px solid #eee; padding:20px; margin-top:10px;";
+        page3Div.appendChild(evClone);
+
+        await new Promise(r => setTimeout(r, 200));
+        const canv3 = await html2canvas(page3Div, { scale: 2 });
+        pdf.addPage();
+        pdf.addImage(canv3.toDataURL("image/jpeg", 0.95), "JPEG", margin, 15, maxLineWidth, (maxLineWidth * canv3.height) / canv3.width);
+        document.body.removeChild(page3Div);
+
+      } else {
+        // =========================================================
+        // PC LOGIC: Everything on Page 2 (No empty space)
+        // =========================================================
+        const pcDiv = document.createElement("div");
+        pcDiv.style.cssText = "position:fixed; left:-9999px; width:1000px; padding:30px; background:#fff; display:flex; flex-direction:column;";
+        document.body.appendChild(pcDiv);
+
+        // Header
+        const hPC = document.createElement("div");
+        hPC.style.cssText = "font-size:32px; font-weight:bold; color:#1a73e8; margin-bottom:20px; text-align:center;";
+        hPC.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} MONTHLY REPORT`;
+        pcDiv.appendChild(hPC);
+
+        // Chart 1
+        const l1 = document.createElement("div");
+        l1.innerText = "1. Daily Peak Power Generation (Watts)";
+        l1.style.cssText = "font-size:20px; font-weight:bold; padding :10px;";
+        pcDiv.appendChild(l1);
+
+        const s1 = document.getElementById("monthlyBarChart");
+        if (s1) {
+            const c1 = await html2canvas(s1, { scale: 2 });
+            const i1 = document.createElement("img");
+            i1.src = c1.toDataURL("image/png");
+            i1.style.cssText = "width:100%; height:320px; object-fit:contain; margin-bottom:25px;";
+            pcDiv.appendChild(i1);
+        }
+
+        // Chart 2
+        const l2 = document.createElement("div");
+        l2.innerText = "2. Daily Total Energy (Units / kWh)";
+        l2.style.cssText = "font-size:22px; font-weight:bold; margin-bottom:10px;";
+        pcDiv.appendChild(l2);
+
+        const s2 = document.getElementById("monthlyEnergyChart");
+        if (s2) {
+            const c2 = await html2canvas(s2, { scale: 2 });
+            const i2 = document.createElement("img");
+            i2.src = c2.toDataURL("image/png");
+            i2.style.cssText = "width:100%; height:320px; object-fit:contain; margin-bottom:15px;";
+            pcDiv.appendChild(i2);
+        }
+
+        // Note & Alerts
+        const nPC = document.createElement("div");
+        nPC.style.cssText = "font-size:14px; color:#666; font-style:italic; margin-bottom:15px;";
+        nPC.innerText = "Note: Energy Units calculated as (Last Value - First Value) / 1000";
+        pcDiv.appendChild(nPC);
+
+        const alPC = document.createElement("div");
+        alPC.innerText = "3. System Performance Alerts";
+        alPC.style.cssText = "font-size:22px; font-weight:bold; margin-bottom:10px;";
+        pcDiv.appendChild(alPC);
+
+        const evPC = eventsArea.cloneNode(true);
+        evPC.style.cssText = "width:100%; font-size:16px; border:1px solid #eee; padding:15px;";
+        pcDiv.appendChild(evPC);
+
+        await new Promise(r => setTimeout(r, 200));
+        const canvPC = await html2canvas(pcDiv, { scale: 2 });
+        pdf.addPage();
+        
+        // Scale the entire Page 2 content to fit perfectly on A4
+        const hPCFinal = (maxLineWidth * canvPC.height) / canvPC.width;
+        const availH = pageHeight - 20;
+        const finalH = hPCFinal > availH ? availH : hPCFinal;
+        
+        pdf.addImage(canvPC.toDataURL("image/jpeg", 0.95), "JPEG", margin, 10, maxLineWidth, finalH);
+        document.body.removeChild(pcDiv);
       }
-      tempDiv.appendChild(chart1Clone);
-
-      // --- 2. Energy Units Chart ---
-      const energyLabel = document.createElement("h3");
-      energyLabel.innerText = "2. Daily Total Energy (Units / kWh)";
-      energyLabel.style.cssText = "width:100%; text-align:left; font-size:24px; color:#333; margin-top:40px; font-weight:bold;";
-      tempDiv.appendChild(energyLabel);
-      
-      const chart2Clone = document.getElementById("monthlyEnergyChart").cloneNode(true);
-      
-      // CRITICAL FIX: Force Width & Center
-      chart2Clone.style.cssText = "width: 1000px !important;  display: flex; flex-direction: column; align-items: center;";
-      
-      const canvas2 = chart2Clone.querySelector('canvas');
-      if(canvas2) {
-          canvas2.style.cssText = "width: 100% !important; height: auto !important;";
-      }
-      tempDiv.appendChild(chart2Clone);
-
-      const infoNote = document.createElement("div");
-      infoNote.style.cssText = "margin-top:10px; font-style:italic; color:#666; font-size:16px; width:100%; text-align:center;";
-      infoNote.innerText = "Note: Energy Units calculated as (Last Value - First Value) / 1000";
-      tempDiv.appendChild(infoNote);
-
-      // --- 3. System Alerts ---
-      const alertsLabel = document.createElement("h3");
-      alertsLabel.innerText = "3. System Performance Alerts";
-      alertsLabel.style.cssText = "width:100%; text-align:center; font-size:24px; color:#333; margin-top:40px; font-weight:bold;";
-      tempDiv.appendChild(alertsLabel);
-      
-      const eventsClone = eventsArea.cloneNode(true);
-      eventsClone.style.cssText = "width:90%; margin: 0 auto; font-size:16px; border:1px solid #eee; padding:20px;";
-      tempDiv.appendChild(eventsClone);
-
-      // Wait for rendering
-      await new Promise((r) => setTimeout(r, 800)); 
-      
-      const canvasMonthly = await html2canvas(tempDiv, { scale: 2, useCORS: true });
-      const monthlyHeight = (maxLineWidth * canvasMonthly.height) / canvasMonthly.width;
-
-      pdf.addPage();
-      // Ensure it fits the page
-      const finalHeight = monthlyHeight > (pageHeight - 20) ? (pageHeight - 20) : monthlyHeight;
-      pdf.addImage(canvasMonthly.toDataURL("image/jpeg", 0.90), "JPEG", margin, 15, maxLineWidth, finalHeight);
-
-      document.body.removeChild(tempDiv);
     }
 
-    // --- PAGE 3: LIFETIME STATISTICS ---
+    // --- PAGE 4: LIFETIME STATISTICS (No changes here) ---
     if (lifetimeChart && lifetimeChart.style.display !== "none") {
         pdf.addPage();
         pdf.setFont("helvetica", "bold");
@@ -851,7 +892,6 @@ async function downloadDashboardSection() {
 
         const canvasLife = await html2canvas(lifetimeChart, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
         const lifeImgHeight = (maxLineWidth * canvasLife.height) / canvasLife.width;
-        
         pdf.addImage(canvasLife.toDataURL("image/jpeg", 0.90), "JPEG", margin, 35, maxLineWidth, lifeImgHeight);
     }
 
