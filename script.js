@@ -791,37 +791,59 @@ async function downloadDashboardSection() {
 
     // --- THE WRAPPER PAGE (ALERTS + LIFETIME CHART) ---
     // This runs for both Mobile and PC, ensuring Error Messages are NEVER missing.
+   // --- THE WRAPPER PAGE (ALERTS + LIFETIME CHART) ---
     const finalWrapper = document.createElement("div");
+    // Background of the whole page remains white
     finalWrapper.style.cssText = "position:fixed; left:-9999px; width:1000px; padding:40px; background:#fff; display:flex; flex-direction:column; align-items:center;";
     
-    // Add Alert Section
+    // 1. Add Alert Title
     const alertsTitle = document.createElement("div");
-    alertsTitle.innerText = "SYSTEM PERFORMANCE ALERTS";
-    alertsTitle.style.cssText = "font-size:28px; font-weight:bold; margin-bottom:15px; color:#333; text-align:center;";
+    alertsTitle.innerText = "3. System Performance Alerts"; // Matching the style in the 2nd image
+    alertsTitle.style.cssText = "font-size:24px; font-weight:bold; margin-bottom:20px; color:#333; text-align:center; font-family:Arial, sans-serif;";
     finalWrapper.appendChild(alertsTitle);
 
+    // 2. Add the Alert Box (The "Past Look" fix)
     const evClone = eventsArea.cloneNode(true);
     const alertContent = evClone.innerText.toLowerCase();
     const hasErrors = alertContent.includes("drop") || alertContent.includes("alert");
-     evClone.style.cssText = "display:block !important; width:100% !important; padding:25px !important; border-radius:10px !important; font-size:22px !important; margin-bottom:30px !important; text-align:left !important; height:auto !important; overflow:visible !important;";
+
+    // Apply specific styling to make it look like image 2 (Narrower, centered, and clean)
+    evClone.style.cssText = `
+        display:block !important; 
+        width:700px !important; 
+        margin: 0 auto 40px auto !important; 
+        padding:25px !important; 
+        border-radius:12px !important; 
+        font-size:18px !important; 
+        text-align:left !important; 
+        height:auto !important; 
+        overflow:visible !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+    `;
+
     if (hasErrors) {
-      evClone.style.backgroundColor = "#fee2e2"; evClone.style.border = "3px solid #ef4444"; evClone.style.color = "#991b1b";
+        evClone.style.backgroundColor = "#fee2e2"; 
+        evClone.style.border = "2px solid #ef4444"; 
+        evClone.style.color = "#991b1b";
     } else {
-      evClone.style.backgroundColor = "#f0fdf4"; evClone.style.border = "2px solid #22c55e"; evClone.style.color = "#166534";
+        evClone.style.backgroundColor = "#f0fdf4"; 
+        evClone.style.border = "2px solid #22c55e"; 
+        evClone.style.color = "#166534";
     }
     finalWrapper.appendChild(evClone);
 
-    // Add Lifetime Graph
+    // 3. Add Lifetime Title
     const lifeTitle = document.createElement("div");
-    lifeTitle.innerText = "MONTHLY ENERGY GENERATION (LIFETIME)";
-    lifeTitle.style.cssText = "font-size:26px; font-weight:bold; margin-bottom:15px; color:#8b5cf6;";
+    lifeTitle.innerText = "LIFETIME ENERGY GENERATION HISTORY"; // Matching style in 2nd image
+    lifeTitle.style.cssText = "font-size:22px; font-weight:bold; margin-bottom:20px; color:#8b5cf6; text-transform: uppercase;";
     finalWrapper.appendChild(lifeTitle);
 
+    // 4. Add Lifetime Graph
     if (lifetimeChart) {
       const cLife = await html2canvas(lifetimeChart, { scale: 3, backgroundColor: "#ffffff" });
       const imgLife = document.createElement("img");
       imgLife.src = cLife.toDataURL("image/png");
-      imgLife.style.cssText = "width:100%; height:auto;"; 
+      imgLife.style.cssText = "width:85%; height:auto; margin: 0 auto;"; // Slightly smaller chart for better layout
       finalWrapper.appendChild(imgLife);
     }
 
