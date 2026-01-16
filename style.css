@@ -803,3 +803,10 @@ option {
   align-items: center; /* Forces flex items to center */
   width: 100%;
 }
+
+#lifetimeChartDiv {
+    min-height: 520px; /* Slightly more than the chart height */
+    width: 100%;
+    overflow: visible !important;
+    padding-bottom: 20px;
+}

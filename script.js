@@ -487,26 +487,60 @@ function drawLifetimeChart(dataArr) {
     
     dt.addRows(rows);
 
+    // const options = {
+    //     title: 'Total Energy Generated per Month (Cumulative)',
+    //     legend: { position: 'none' },
+    //     colors: ['#ea7f1b'],
+    //     height: 500,
+    //     bar: { groupWidth: '60%' },
+    //     vAxis: { 
+    //         title: 'Energy (kWh)',
+    //         minValue: 0,
+    //         gridlines: { count: 6 }
+    //     },
+    //     hAxis: {
+    //         title: 'Month',
+    //     },
+    //     chartArea: { width: '85%', height: '75%', top: '10%', bottom: '15%' },
+    //     animation: {
+    //       startup: true,
+    //       duration: 1000,
+    //       easing: 'out',
+    //     }
+    // };
     const options = {
-        title: 'Total Energy Generated per Month (Cumulative)',
-        legend: { position: 'none' },
-        colors: ['#ea7f1b'],
-        bar: { groupWidth: '60%' },
-        vAxis: { 
-            title: 'Energy (kWh)',
-            minValue: 0
-        },
-        hAxis: {
-            title: 'Month'
-        },
-        chartArea: { width: '85%', height: '70%' },
-        animation: {
-          startup: true,
-          duration: 1000,
-          easing: 'out',
-        }
-    };
-
+    title: 'Total Energy Generated per Month (Cumulative)',
+    legend: { position: 'none' },
+    colors: ['#ea7f1b'],
+    height: 500, // Keep your tall height
+    bar: { groupWidth: '60%' },
+    vAxis: { 
+        title: 'Energy (kWh)',
+        minValue: 0,
+        gridlines: { count: 6 }
+    },
+    hAxis: {
+        title: 'Month',
+        titlePosition: 'out',
+        // Bold and slightly larger font helps it show up
+        titleTextStyle: { italic: false, bold: true, fontSize: 14 }, 
+        textStyle: { fontSize: 12 }
+    },
+    // ADJUSTED CHART AREA:
+    // We reduced the internal chart height from 75% to 65% 
+    // and increased the bottom margin from 15% to 25%
+    chartArea: { 
+        width: '85%', 
+        height: '65%', 
+        top: '10%', 
+        bottom: '25%' 
+    },
+    animation: {
+        startup: true,
+        duration: 1000,
+        easing: 'out',
+    }
+};
     const chart = new google.visualization.ColumnChart(chartDiv);
     chart.draw(dt, options);
 }
