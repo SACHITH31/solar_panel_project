@@ -697,7 +697,6 @@ function closeMonthPopup() {
 }
 
 /* REPLACE THIS FUNCTION IN script.js */
-
 async function downloadDashboardSection() {
   const btn = document.getElementById("downloadBtn");
   const btnText = document.getElementById("btnText");
@@ -708,6 +707,42 @@ async function downloadDashboardSection() {
   const mvMonth = document.getElementById("mvMonth");
   const mvYear = document.getElementById("mvYear");
   const dateValue = document.getElementById("datePicker").value;
+
+  // =========================================================
+  // 1. MANDATORY CHART LOADING CHECK (NEW ADDITION)
+  // =========================================================
+  function isChartReady(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return false;
+    
+    // Check for actual drawing elements (Canvas or SVG)
+    const hasCanvas = container.querySelector('canvas') !== null;
+    const hasSvg = container.querySelector('svg') !== null;
+    
+    // Check if the UI still says "Loading" or has a spinner
+    const isStillLoading = container.innerText.toLowerCase().includes("loading") || 
+                           container.innerHTML.includes("spinner");
+
+    return (hasCanvas || hasSvg) && !isStillLoading;
+  }
+
+  // A. Check Main Solar Power Graph (Look inside download-area)
+  const mainGraphReady = mainArea.querySelector('canvas') || mainArea.querySelector('svg');
+
+  // B. Check Monthly Energy Bar Graph (Only if monthly view is open)
+  const isMonthlyActive = monthlyContainer && monthlyContainer.style.display !== "none";
+  let monthlyGraphReady = true;
+  if (isMonthlyActive) {
+    // Specifically checks the 'monthlyEnergyChart' container
+    monthlyGraphReady = isChartReady("monthlyEnergyChart");
+  }
+
+  // IF GRAPHS ARE NOT READY, SHOW MESSAGE AND STOP
+  if (!mainGraphReady || !monthlyGraphReady) {
+    alert("⚠️ Charts are still loading data.\n\nPlease wait for the Solar Power Graph and the Monthly Energy Graph to appear completely before downloading.");
+    return; // This stops the entire function immediately
+  }
+  // =========================================================
 
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
@@ -722,8 +757,6 @@ async function downloadDashboardSection() {
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
     const contentMaxHeight = pageHeight - 25; // Safety zone for footer
-
-    const isMonthlyActive = monthlyContainer && monthlyContainer.style.display !== "none";
 
     // --- PAGE 1: DAILY DASHBOARD ---
     const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
@@ -814,7 +847,6 @@ async function downloadDashboardSection() {
         pdf.addPage();
         let h4 = (maxLineWidth * canv4.height) / canv4.width;
         
-        // SAFETY SCALE: If content is taller than page, shrink it to fit so bottom is not cut
         if (h4 > contentMaxHeight) {
             const scaleFactor = contentMaxHeight / h4;
             h4 = contentMaxHeight;
@@ -868,7 +900,6 @@ async function downloadDashboardSection() {
         pdf.addPage();
         let hPCFinal = (maxLineWidth * canvPC.height) / canvPC.width;
 
-        // PC SAFETY SCALE: If the error list makes the page too long, scale it down to fit on A4
         if (hPCFinal > contentMaxHeight) {
             const pcScale = contentMaxHeight / hPCFinal;
             hPCFinal = contentMaxHeight;
@@ -880,7 +911,7 @@ async function downloadDashboardSection() {
       }
     }
 
-    // --- FINAL LIFETIME PAGE (PC ONLY) ---
+    // --- FINAL LIFETIME PAGE ---
     if (!isMobile && lifetimeChart && lifetimeChart.style.display !== "none") {
         pdf.addPage();
         pdf.setFont("helvetica", "bold");
