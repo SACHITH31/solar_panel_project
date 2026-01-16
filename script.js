@@ -797,11 +797,18 @@ async function downloadDashboardSection() {
     // Add Alert Section
     const alertsTitle = document.createElement("div");
     alertsTitle.innerText = "SYSTEM PERFORMANCE ALERTS";
-    alertsTitle.style.cssText = "font-size:28px; font-weight:bold; margin-bottom:15px; color:#333;";
+    alertsTitle.style.cssText = "font-size:28px; font-weight:bold; margin-bottom:15px; color:#333; text-align:center;";
     finalWrapper.appendChild(alertsTitle);
 
     const evClone = eventsArea.cloneNode(true);
-    evClone.style.cssText = "display:block !important; width:100%; padding:20px; border-radius:10px; font-size:22px; background:#f8fafc; border:2px solid #e2e8f0; margin-bottom:30px;";
+    const alertContent = evClone.innerText.toLowerCase();
+    const hasErrors = alertContent.includes("drop") || alertContent.includes("alert");
+     evClone.style.cssText = "display:block !important; width:100% !important; padding:25px !important; border-radius:10px !important; font-size:22px !important; margin-bottom:30px !important; text-align:left !important; height:auto !important; overflow:visible !important;";
+    if (hasErrors) {
+      evClone.style.backgroundColor = "#fee2e2"; evClone.style.border = "3px solid #ef4444"; evClone.style.color = "#991b1b";
+    } else {
+      evClone.style.backgroundColor = "#f0fdf4"; evClone.style.border = "2px solid #22c55e"; evClone.style.color = "#166534";
+    }
     finalWrapper.appendChild(evClone);
 
     // Add Lifetime Graph
