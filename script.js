@@ -697,20 +697,41 @@ function closeMonthPopup() {
 }
 
 /* REPLACE THIS FUNCTION IN script.js */
-
 async function downloadDashboardSection() {
   const btn = document.getElementById("downloadBtn");
   const btnText = document.getElementById("btnText");
   const mainArea = document.getElementById("download-area");
   const eventsArea = document.getElementById("events");
   const monthlyContainer = document.getElementById("monthlyBarChartContainer");
+  
+  // Specific elements for the Last Bar Graph (Lifetime)
   const lifetimeChart = document.getElementById("lifetimeChartDiv");
+  const lifetimeLoader = document.getElementById("lifetimeLoader");
+  const lifetimeStatusText = document.getElementById("lifetimeStatusText");
+
   const mvMonth = document.getElementById("mvMonth");
   const mvYear = document.getElementById("mvYear");
   const dateValue = document.getElementById("datePicker").value;
 
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  // =========================================================
+  // 1. THE STRICT GATEKEEPER
+  // =========================================================
+  const isTopFetching = mainArea.innerText.toLowerCase().includes("fetching") || 
+                        mainArea.innerText.toLowerCase().includes("please wait");
 
+  const isLastBarFetching = (lifetimeLoader && lifetimeLoader.style.display !== "none") || 
+                            (lifetimeChart && lifetimeChart.style.display === "none") ||
+                            (lifetimeStatusText && lifetimeStatusText.innerText.toLowerCase().includes("fetching"));
+
+  if (isTopFetching || isLastBarFetching) {
+    alert("⚠️ Data Fetching in Progress...\n\nPlease wait until all graphs are visible on your screen before downloading the PDF.");
+    return; 
+  }
+
+  // =========================================================
+  // 2. INITIALIZE PDF & SETTINGS
+  // =========================================================
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   btn.disabled = true;
   btnText.innerHTML = `<span class="spinner"></span> Generating Full Report...`;
 
@@ -721,175 +742,98 @@ async function downloadDashboardSection() {
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
-    const contentMaxHeight = pageHeight - 25; // Safety zone for footer
+    const contentMaxHeight = pageHeight - 25; 
 
     const isMonthlyActive = monthlyContainer && monthlyContainer.style.display !== "none";
 
-    // --- PAGE 1: DAILY DASHBOARD ---
+    // --- PAGE 1: DAILY DASHBOARD (Always Included) ---
     const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
     if (typeof addPdfHeader === "function") addPdfHeader(pdf, dateValue, margin);
     const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
     pdf.addImage(canvasMain.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, mainHeight);
 
+    // =========================================================
+    // 3. LOGIC FOR ADDITIONAL PAGES
+    // =========================================================
+
     if (isMonthlyActive) {
+      // --- CASE B: MONTHLY VIEW IS ACTIVE ---
       if (isMobile) {
-        // --- MOBILE PAGE 2: POWER CHART ---
-        const p2Div = document.createElement("div");
-        p2Div.style.cssText = "position:fixed; left:-9999px; width:1000px; padding:40px; background:#fff; display:flex; flex-direction:column; align-items:center;";
-        document.body.appendChild(p2Div);
-        const h1 = document.createElement("div");
-        h1.style.cssText = "font-size:36px; font-weight:bold; color:#1a73e8; margin-bottom:20px; text-align:center; width:100%;";
-        h1.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} MONTHLY REPORT`;
-        p2Div.appendChild(h1);
-        const source1 = document.getElementById("monthlyBarChart");
-        if (source1) {
-            const c1 = await html2canvas(source1, { scale: 2 });
-            const img1 = document.createElement("img");
-            img1.src = c1.toDataURL("image/png");
-            img1.style.cssText = "width:100%; height:auto;";
-            p2Div.appendChild(img1);
+        // Mobile Page 2: Monthly Power
+        const m1 = document.getElementById("monthlyBarChart");
+        if (m1) {
+          pdf.addPage();
+          const cm1 = await html2canvas(m1, { scale: 2 });
+          pdf.addImage(cm1.toDataURL("image/jpeg", 0.95), "JPEG", margin, 20, maxLineWidth, (maxLineWidth * cm1.height) / cm1.width);
         }
-        const canv2 = await html2canvas(p2Div, { scale: 2 });
-        pdf.addPage();
-        pdf.addImage(canv2.toDataURL("image/jpeg", 0.95), "JPEG", margin, 15, maxLineWidth, (maxLineWidth * canv2.height) / canv2.width);
-        document.body.removeChild(p2Div);
-
-        // --- MOBILE PAGE 3: ENERGY CHART ---
-        const p3Div = document.createElement("div");
-        p3Div.style.cssText = "position:fixed; left:-9999px; width:1000px; padding:40px; background:#fff; display:flex; flex-direction:column; align-items:center;";
-        document.body.appendChild(p3Div);
-        const p2Label = document.createElement("div");
-        p2Label.innerText = "2. Daily Total Energy (Units / kWh)";
-        p2Label.style.cssText = "width:100%; font-size:26px; font-weight:bold; color:#333; margin-bottom:20px;";
-        p3Div.appendChild(p2Label);
-        const source2 = document.getElementById("monthlyEnergyChart");
-        if (source2) {
-            const c2 = await html2canvas(source2, { scale: 2 });
-            const img2 = document.createElement("img");
-            img2.src = c2.toDataURL("image/png");
-            img2.style.cssText = "width:100%; height:auto;";
-            p3Div.appendChild(img2);
+        // Mobile Page 3: Monthly Energy
+        const m2 = document.getElementById("monthlyEnergyChart");
+        if (m2) {
+          pdf.addPage();
+          const cm2 = await html2canvas(m2, { scale: 2 });
+          pdf.addImage(cm2.toDataURL("image/jpeg", 0.95), "JPEG", margin, 20, maxLineWidth, (maxLineWidth * cm2.height) / cm2.width);
         }
-        const canv3 = await html2canvas(p3Div, { scale: 2 });
-        pdf.addPage();
-        pdf.addImage(canv3.toDataURL("image/jpeg", 0.95), "JPEG", margin, 15, maxLineWidth, (maxLineWidth * canv3.height) / canv3.width);
-        document.body.removeChild(p3Div);
-
-        // --- MOBILE PAGE 4: ALERTS & LIFETIME (SMART OVERFLOW) ---
-        const page4Div = document.createElement("div");
-        page4Div.style.cssText = "position:fixed; left:-9999px; width:1000px; padding:40px; background:#fff; display:flex; flex-direction:column; align-items:center; font-family: Arial, sans-serif; height:auto; overflow:visible;";
-        document.body.appendChild(page4Div);
-
-        const alertsLabel = document.createElement("div");
-        alertsLabel.innerText = "3. System Performance Alerts";
-        alertsLabel.style.cssText = "width:100%; font-size:28px; font-weight:bold; color:#333; margin-bottom:15px; text-align:center;";
-        page4Div.appendChild(alertsLabel);
-
-        const evClone = eventsArea.cloneNode(true);
-        const alertContent = evClone.innerText.toLowerCase();
-        const hasErrors = alertContent.includes("drop") || alertContent.includes("alert");
-        evClone.style.cssText = "display:block !important; width:100% !important; padding:25px !important; border-radius:10px !important; font-size:22px !important; margin-bottom:30px !important; text-align:left !important; height:auto !important; overflow:visible !important;";
-        if (hasErrors) {
-            evClone.style.backgroundColor = "#fee2e2"; evClone.style.border = "3px solid #ef4444"; evClone.style.color = "#991b1b";
-        } else {
-            evClone.style.backgroundColor = "#f0fdf4"; evClone.style.border = "2px solid #22c55e"; evClone.style.color = "#166534";
-        }
-        page4Div.appendChild(evClone);
-
-        const lifeLabel = document.createElement("div");
-        lifeLabel.innerText = "LIFETIME ENERGY GENERATION HISTORY";
-        lifeLabel.style.cssText = "width:100%; font-size:26px; font-weight:bold; color:#8b5cf6; margin-bottom:10px; text-align:center;";
-        page4Div.appendChild(lifeLabel);
-
-        if (lifetimeChart) {
-            const cLife = await html2canvas(lifetimeChart, { scale: 3, backgroundColor: "#ffffff" });
-            const imgLife = document.createElement("img");
-            imgLife.src = cLife.toDataURL("image/png");
-            imgLife.style.cssText = "width:100%; height:auto;"; 
-            page4Div.appendChild(imgLife);
-        }
-
-        await new Promise(r => setTimeout(r, 600));
-        const canv4 = await html2canvas(page4Div, { scale: 2, windowHeight: page4Div.scrollHeight });
-        pdf.addPage();
-        let h4 = (maxLineWidth * canv4.height) / canv4.width;
-        
-        // SAFETY SCALE: If content is taller than page, shrink it to fit so bottom is not cut
-        if (h4 > contentMaxHeight) {
-            const scaleFactor = contentMaxHeight / h4;
-            h4 = contentMaxHeight;
-            pdf.addImage(canv4.toDataURL("image/jpeg", 0.95), "JPEG", margin + ((maxLineWidth - (maxLineWidth * scaleFactor))/2), 15, maxLineWidth * scaleFactor, h4);
-        } else {
-            pdf.addImage(canv4.toDataURL("image/jpeg", 0.95), "JPEG", margin, 15, maxLineWidth, h4);
-        }
-        document.body.removeChild(page4Div);
-
       } else {
-        // --- PC LOGIC (SMART OVERFLOW) ---
-        const pcDiv = document.createElement("div");
-        pcDiv.style.cssText = "position:fixed; left:-9999px; width:1200px; padding:50px; background:#ffffff; display:flex; flex-direction:column; align-items:center; height:auto; overflow:visible;";
-        document.body.appendChild(pcDiv);
-
-        const hPC = document.createElement("div");
-        hPC.style.cssText = "font-size:38px; font-weight:bold; color:#1a73e8; margin-bottom:20px; text-align:center; width:100%;";
-        hPC.innerText = `${mvMonth.options[mvMonth.selectedIndex].text} ${mvYear.value} MONTHLY REPORT`;
-        pcDiv.appendChild(hPC);
-
+        // PC Page 2: Both Monthly Charts combined
+        const pcMonthDiv = document.createElement("div");
+        pcMonthDiv.style.cssText = "position:fixed; left:-9999px; width:1200px; padding:40px; background:#fff;";
         const s1 = document.getElementById("monthlyBarChart");
-        if (s1) {
-            const c1 = await html2canvas(s1, { scale: 3 });
-            const i1 = document.createElement("img");
-            i1.src = c1.toDataURL("image/png");
-            i1.style.cssText = "width:100%; height:auto; margin-bottom:40px;";
-            pcDiv.appendChild(i1);
-        }
-
         const s2 = document.getElementById("monthlyEnergyChart");
-        if (s2) {
-            const c2 = await html2canvas(s2, { scale: 3 });
-            const i2 = document.createElement("img");
-            i2.src = c2.toDataURL("image/png");
-            i2.style.cssText = "width:100%; height:auto; margin-bottom:30px;";
-            pcDiv.appendChild(i2);
-        }
-
-        const evClone = eventsArea.cloneNode(true);
-        evClone.style.cssText = "display:block; width:100%; padding:25px; border-radius:8px; font-size:22px; text-align:left; height:auto; overflow:visible;";
-        const hasAlerts = evClone.innerText.toLowerCase().includes("drop") || evClone.innerText.toLowerCase().includes("alert");
-        if (hasAlerts) {
-            evClone.style.backgroundColor = "#fee2e2"; evClone.style.border = "2px solid #ef4444"; evClone.style.color = "#991b1b";
-        } else {
-            evClone.style.backgroundColor = "#f0fdf4"; evClone.style.border = "2px solid #22c55e"; evClone.style.color = "#166534";
-        }
-        pcDiv.appendChild(evClone);
-
-        await new Promise(r => setTimeout(r, 600));
-        const canvPC = await html2canvas(pcDiv, { scale: 2, windowHeight: pcDiv.scrollHeight });
+        if(s1) { const c1 = await html2canvas(s1, {scale:2}); const i1 = document.createElement("img"); i1.src=c1.toDataURL(); i1.style.width="100%"; pcMonthDiv.appendChild(i1); }
+        if(s2) { const c2 = await html2canvas(s2, {scale:2}); const i2 = document.createElement("img"); i2.src=c2.toDataURL(); i2.style.width="100%"; pcMonthDiv.appendChild(i2); }
+        document.body.appendChild(pcMonthDiv);
+        const cpcm = await html2canvas(pcMonthDiv, {scale:2});
         pdf.addPage();
-        let hPCFinal = (maxLineWidth * canvPC.height) / canvPC.width;
-
-        // PC SAFETY SCALE: If the error list makes the page too long, scale it down to fit on A4
-        if (hPCFinal > contentMaxHeight) {
-            const pcScale = contentMaxHeight / hPCFinal;
-            hPCFinal = contentMaxHeight;
-            pdf.addImage(canvPC.toDataURL("image/jpeg", 0.95), "JPEG", margin + ((maxLineWidth - (maxLineWidth * pcScale))/2), 10, maxLineWidth * pcScale, hPCFinal);
-        } else {
-            pdf.addImage(canvPC.toDataURL("image/jpeg", 0.95), "JPEG", margin, 10, maxLineWidth, hPCFinal);
-        }
-        document.body.removeChild(pcDiv);
+        pdf.addImage(cpcm.toDataURL("image/jpeg", 0.95), "JPEG", margin, 20, maxLineWidth, (maxLineWidth * cpcm.height) / cpcm.width);
+        document.body.removeChild(pcMonthDiv);
       }
     }
 
-    // --- FINAL LIFETIME PAGE (PC ONLY) ---
-    if (!isMobile && lifetimeChart && lifetimeChart.style.display !== "none") {
-        pdf.addPage();
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(18);
-        pdf.setTextColor(139, 92, 246);
-        pdf.text("LIFETIME ENERGY GENERATION HISTORY", pageWidth / 2, 20, { align: "center" });
-        const canvasLife = await html2canvas(lifetimeChart, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-        pdf.addImage(canvasLife.toDataURL("image/jpeg", 0.90), "JPEG", margin, 35, maxLineWidth, (maxLineWidth * canvasLife.height) / canvasLife.width);
+    // --- THE WRAPPER PAGE (ALERTS + LIFETIME CHART) ---
+    // This runs for both Mobile and PC, ensuring Error Messages are NEVER missing.
+    const finalWrapper = document.createElement("div");
+    finalWrapper.style.cssText = "position:fixed; left:-9999px; width:1000px; padding:40px; background:#fff; display:flex; flex-direction:column; align-items:center;";
+    
+    // Add Alert Section
+    const alertsTitle = document.createElement("div");
+    alertsTitle.innerText = "SYSTEM PERFORMANCE ALERTS";
+    alertsTitle.style.cssText = "font-size:28px; font-weight:bold; margin-bottom:15px; color:#333; text-align:center;";
+    finalWrapper.appendChild(alertsTitle);
+
+    const evClone = eventsArea.cloneNode(true);
+    const alertContent = evClone.innerText.toLowerCase();
+    const hasErrors = alertContent.includes("drop") || alertContent.includes("alert");
+     evClone.style.cssText = "display:block !important; width:100% !important; padding:25px !important; border-radius:10px !important; font-size:22px !important; margin-bottom:30px !important; text-align:left !important; height:auto !important; overflow:visible !important;";
+    if (hasErrors) {
+      evClone.style.backgroundColor = "#fee2e2"; evClone.style.border = "3px solid #ef4444"; evClone.style.color = "#991b1b";
+    } else {
+      evClone.style.backgroundColor = "#f0fdf4"; evClone.style.border = "2px solid #22c55e"; evClone.style.color = "#166534";
     }
+    finalWrapper.appendChild(evClone);
+
+    // Add Lifetime Graph
+    const lifeTitle = document.createElement("div");
+    lifeTitle.innerText = "MONTHLY ENERGY GENERATION (LIFETIME)";
+    lifeTitle.style.cssText = "font-size:26px; font-weight:bold; margin-bottom:15px; color:#8b5cf6;";
+    finalWrapper.appendChild(lifeTitle);
+
+    if (lifetimeChart) {
+      const cLife = await html2canvas(lifetimeChart, { scale: 3, backgroundColor: "#ffffff" });
+      const imgLife = document.createElement("img");
+      imgLife.src = cLife.toDataURL("image/png");
+      imgLife.style.cssText = "width:100%; height:auto;"; 
+      finalWrapper.appendChild(imgLife);
+    }
+
+    document.body.appendChild(finalWrapper);
+    await new Promise(r => setTimeout(r, 600));
+    const canvFinal = await html2canvas(finalWrapper, { scale: 2 });
+    
+    pdf.addPage();
+    let hFinal = (maxLineWidth * canvFinal.height) / canvFinal.width;
+    if (hFinal > contentMaxHeight) hFinal = contentMaxHeight;
+    pdf.addImage(canvFinal.toDataURL("image/jpeg", 0.95), "JPEG", margin, 15, maxLineWidth, hFinal);
+    document.body.removeChild(finalWrapper);
 
     // --- FOOTER ---
     const totalPages = pdf.internal.getNumberOfPages();
@@ -903,7 +847,6 @@ async function downloadDashboardSection() {
     pdf.save(`Solar_Report_${dateValue}.pdf`);
   } catch (error) {
     console.error(error);
-    alert("PDF Error: Check console.");
   } finally {
     btn.disabled = false;
     btnText.innerText = "📝Download PDF";
