@@ -9,6 +9,8 @@ const START_DATE_STR = "2025-11-22";
 
 let pollingTimer = null;
 let lastDataTable = null;
+let lifetimeChartInstance = null;
+let lifetimeYearFilterInitialized = false;
 const detectedEventSet = new Set();
 
 const METRIC_COLUMNS = [
@@ -36,10 +38,8 @@ function init() {
   loadData(today);
   startPolling(today);
 
-  // Trigger the new feature (Lifetime Stats)
-  // We use a small timeout so the main dashboard loads first
   setTimeout(() => {
-    generateLifetimeGraph();
+    setupLifetimeYearFilterUI();
   }, 1500);
 
   window.addEventListener("resize", () => {
@@ -397,8 +397,48 @@ function populateMonthViewYears() {
 }
 
 /* ---------- NEW FEATURE: LIFETIME MONTHLY DATA ---------- */
+function setupLifetimeYearFilterUI() {
+  if (lifetimeYearFilterInitialized) return;
 
-async function generateLifetimeGraph() {
+  const container = document.getElementById("lifetimeYearFilterContainer");
+  if (!container) return;
+
+  const startYear = new Date(START_DATE_STR).getFullYear();
+  const currentYear = new Date().getFullYear();
+  const defaultYear = currentYear < startYear ? startYear : currentYear;
+
+  const yearSelect = document.createElement("select");
+  yearSelect.id = "yearSelect";
+  yearSelect.style.marginRight = "8px";
+
+  for (let y = startYear; y <= currentYear; y++) {
+    const opt = document.createElement("option");
+    opt.value = y;
+    opt.textContent = y;
+    yearSelect.appendChild(opt);
+  }
+
+  yearSelect.value = String(defaultYear);
+
+  const yearFilterBtn = document.createElement("button");
+  yearFilterBtn.id = "yearFilterBtn";
+  yearFilterBtn.className = "okButton";
+  yearFilterBtn.textContent = "OK";
+
+  container.innerHTML = "";
+  container.appendChild(yearSelect);
+  container.appendChild(yearFilterBtn);
+
+  yearFilterBtn.onclick = () => {
+    const selectedYear = parseInt(yearSelect.value, 10);
+    generateLifetimeGraph(selectedYear);
+  };
+
+  lifetimeYearFilterInitialized = true;
+  generateLifetimeGraph(defaultYear);
+}
+
+async function generateLifetimeGraph(selectedYear) {
   const loader = document.getElementById('lifetimeLoader');
   const statusText = document.getElementById('lifetimeStatusText');
   const chartDiv = document.getElementById('lifetimeChartDiv');
@@ -408,65 +448,65 @@ async function generateLifetimeGraph() {
 
   const startDate = new Date(START_DATE_STR);
   const today = new Date();
-  
-  // We need to loop from Start Date Month to Current Month
-  let currentIterDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-  const monthList = [];
+  const startYear = startDate.getFullYear();
+  const currentYear = today.getFullYear();
+  const activeYear =
+    Number.isInteger(selectedYear) && selectedYear >= startYear && selectedYear <= currentYear
+      ? selectedYear
+      : (currentYear < startYear ? startYear : currentYear);
 
-  while (currentIterDate <= today) {
+  const monthList = [];
+  const startMonth = activeYear === startYear ? startDate.getMonth() + 1 : 1;
+  const endMonth = activeYear === currentYear ? today.getMonth() + 1 : 12;
+
+  for (let month = startMonth; month <= endMonth; month++) {
     monthList.push({
-      month: currentIterDate.getMonth() + 1,
-      year: currentIterDate.getFullYear()
+      month,
+      year: activeYear
     });
-    // Move to next month
-    currentIterDate.setMonth(currentIterDate.getMonth() + 1);
   }
 
   const monthlyTotals = [];
 
-  // Process each month sequentially
   for (const mData of monthList) {
     statusText.innerText = `Calculating data for ${mData.month}/${mData.year}...`;
-    
-    // Calculate start and end day for this specific month
+
     let startDay = 1;
-    if (mData.month === (startDate.getMonth() + 1) && mData.year === startDate.getFullYear()) {
+    if (mData.month === (startDate.getMonth() + 1) && mData.year === startYear) {
       startDay = startDate.getDate();
     }
 
     let endDay = new Date(mData.year, mData.month, 0).getDate();
-    if (mData.month === (today.getMonth() + 1) && mData.year === today.getFullYear()) {
+    if (mData.month === (today.getMonth() + 1) && mData.year === currentYear) {
       endDay = today.getDate();
     }
 
     const dayPromises = [];
     for (let d = startDay; d <= endDay; d++) {
-        const dateStr = `${mData.year}-${String(mData.month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-        dayPromises.push(fetchDailyEnergyStats(dateStr, d));
+      const dateStr = `${mData.year}-${String(mData.month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      dayPromises.push(fetchDailyEnergyStats(dateStr, d));
     }
 
     const dayResults = await Promise.all(dayPromises);
-    
-    let monthSum = 0;
-    dayResults.forEach(res => {
-        if(res && res.energyKwh) {
-            monthSum += res.energyKwh;
-        }
-    });
-    
-    // --- DEBUG CONSOLE LOG FOR USER CONFIRMATION ---
-    const monthName = new Date(mData.year, mData.month - 1).toLocaleString('default', { month: 'long' });
-    // console.log(`✅ >>> TOTAL FOR ${monthName} ${mData.year}: ${monthSum.toFixed(4)} kWh <<<`);
-    // console.log("---------------------------------------------------------------");
-    // -----------------------------------------------
 
-    monthlyTotals.push({
-        label: `${monthName.substring(0,3)} ${mData.year}`,
-        value: monthSum
+    let monthSum = 0;
+    let hasData = false;
+    dayResults.forEach((res) => {
+      if (res && typeof res.energyKwh === "number" && !isNaN(res.energyKwh)) {
+        monthSum += res.energyKwh;
+        hasData = true;
+      }
     });
+
+    if (hasData) {
+      const monthName = new Date(mData.year, mData.month - 1).toLocaleString('default', { month: 'long' });
+      monthlyTotals.push({
+        label: `${monthName.substring(0, 3)} ${mData.year}`,
+        value: monthSum
+      });
+    }
   }
 
-  // All Done
   loader.style.display = 'none';
   chartDiv.style.display = 'block';
   drawLifetimeChart(monthlyTotals);
@@ -474,6 +514,11 @@ async function generateLifetimeGraph() {
 
 function drawLifetimeChart(dataArr) {
     const chartDiv = document.getElementById('lifetimeChartDiv');
+    if (lifetimeChartInstance && typeof lifetimeChartInstance.destroy === "function") {
+      lifetimeChartInstance.destroy();
+    }
+    chartDiv.innerHTML = "";
+
     const dt = new google.visualization.DataTable();
     dt.addColumn('string', 'Month');
     dt.addColumn('number', 'Total Generated (kWh)');
@@ -541,8 +586,8 @@ function drawLifetimeChart(dataArr) {
         easing: 'out',
     }
 };
-    const chart = new google.visualization.ColumnChart(chartDiv);
-    chart.draw(dt, options);
+    lifetimeChartInstance = new google.visualization.ColumnChart(chartDiv);
+    lifetimeChartInstance.draw(dt, options);
 }
 
 /* ---------- SUMMARY & METRICS (EXISTING) ---------- */
@@ -928,3 +973,5 @@ function isDateInRange(dStr) {
   const d = new Date(dStr);
   return d >= new Date("2025-11-22") && d <= new Date(getTodayDate());
 }
+
+
