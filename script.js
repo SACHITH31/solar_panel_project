@@ -11,6 +11,7 @@ let pollingTimer = null;
 let lastDataTable = null;
 let lifetimeChartInstance = null;
 let lifetimeYearFilterInitialized = false;
+const lifetimeDayCache = new Map();
 const detectedEventSet = new Set();
 
 const METRIC_COLUMNS = [
@@ -466,10 +467,18 @@ async function generateLifetimeGraph(selectedYear) {
     });
   }
 
-  const monthlyTotals = [];
+  const getDailyEnergyStatsCached = (dateStr, dayNum) => {
+    if (!lifetimeDayCache.has(dateStr)) {
+      lifetimeDayCache.set(dateStr, fetchDailyEnergyStats(dateStr, dayNum));
+    }
+    return lifetimeDayCache.get(dateStr);
+  };
 
-  for (const mData of monthList) {
-    statusText.innerText = `Calculating data for ${mData.month}/${mData.year}...`;
+  const monthlyTotals = [];
+  let completedMonths = 0;
+  statusText.innerText = `Calculating ${monthList.length} month(s) for ${activeYear}...`;
+
+  const monthTasks = monthList.map(async (mData) => {
 
     let startDay = 1;
     if (mData.month === (startDate.getMonth() + 1) && mData.year === startYear) {
@@ -484,7 +493,7 @@ async function generateLifetimeGraph(selectedYear) {
     const dayPromises = [];
     for (let d = startDay; d <= endDay; d++) {
       const dateStr = `${mData.year}-${String(mData.month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      dayPromises.push(fetchDailyEnergyStats(dateStr, d));
+      dayPromises.push(getDailyEnergyStatsCached(dateStr, d));
     }
 
     const dayResults = await Promise.all(dayPromises);
@@ -498,14 +507,29 @@ async function generateLifetimeGraph(selectedYear) {
       }
     });
 
+    completedMonths += 1;
+    statusText.innerText = `Calculated ${completedMonths}/${monthList.length} month(s) for ${activeYear}...`;
+
     if (hasData) {
       const monthName = new Date(mData.year, mData.month - 1).toLocaleString('default', { month: 'long' });
-      monthlyTotals.push({
+      return {
         label: `${monthName.substring(0, 3)} ${mData.year}`,
         value: monthSum
-      });
+      };
     }
-  }
+    return null;
+  });
+
+  const monthResults = await Promise.all(monthTasks);
+  monthResults.forEach((m) => {
+    if (m) monthlyTotals.push(m);
+  });
+
+  monthlyTotals.sort((a, b) => {
+    const da = new Date(a.label);
+    const db = new Date(b.label);
+    return da - db;
+  });
 
   loader.style.display = 'none';
   chartDiv.style.display = 'block';
