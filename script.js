@@ -443,6 +443,7 @@ async function generateLifetimeGraph(selectedYear) {
   const loader = document.getElementById('lifetimeLoader');
   const statusText = document.getElementById('lifetimeStatusText');
   const chartDiv = document.getElementById('lifetimeChartDiv');
+  const rangeText = document.getElementById('lifetimeRangeText');
 
   loader.style.display = 'block';
   chartDiv.style.display = 'none';
@@ -460,6 +461,12 @@ async function generateLifetimeGraph(selectedYear) {
   const startMonth = activeYear === startYear ? startDate.getMonth() + 1 : 1;
   const endMonth = activeYear === currentYear ? today.getMonth() + 1 : 12;
 
+  if (rangeText) {
+    const fromLabel = new Date(activeYear, startMonth - 1, 1).toLocaleString("en", { month: "short" });
+    const toLabel = new Date(activeYear, endMonth - 1, 1).toLocaleString("en", { month: "short" });
+    rangeText.textContent = `Showing ${activeYear} data (${fromLabel} to ${toLabel})`;
+  }
+
   for (let month = startMonth; month <= endMonth; month++) {
     monthList.push({
       month,
@@ -467,18 +474,33 @@ async function generateLifetimeGraph(selectedYear) {
     });
   }
 
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const fetchDailyEnergyStatsWithRetry = async (dateStr, dayNum, maxAttempts = 3) => {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const result = await fetchDailyEnergyStats(dateStr, dayNum);
+      if (result) return result;
+      if (attempt < maxAttempts) await sleep(120 * attempt);
+    }
+    return null;
+  };
+
   const getDailyEnergyStatsCached = (dateStr, dayNum) => {
     if (!lifetimeDayCache.has(dateStr)) {
-      lifetimeDayCache.set(dateStr, fetchDailyEnergyStats(dateStr, dayNum));
+      const requestPromise = fetchDailyEnergyStatsWithRetry(dateStr, dayNum).then((result) => {
+        if (!result) lifetimeDayCache.delete(dateStr);
+        return result;
+      });
+      lifetimeDayCache.set(dateStr, requestPromise);
     }
     return lifetimeDayCache.get(dateStr);
   };
 
   const monthlyTotals = [];
-  let completedMonths = 0;
+  const chunkSize = 7;
   statusText.innerText = `Calculating ${monthList.length} month(s) for ${activeYear}...`;
 
-  const monthTasks = monthList.map(async (mData) => {
+  for (let monthIndex = 0; monthIndex < monthList.length; monthIndex++) {
+    const mData = monthList[monthIndex];
 
     let startDay = 1;
     if (mData.month === (startDate.getMonth() + 1) && mData.year === startYear) {
@@ -490,13 +512,18 @@ async function generateLifetimeGraph(selectedYear) {
       endDay = today.getDate();
     }
 
-    const dayPromises = [];
+    const dayRequests = [];
     for (let d = startDay; d <= endDay; d++) {
       const dateStr = `${mData.year}-${String(mData.month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      dayPromises.push(getDailyEnergyStatsCached(dateStr, d));
+      dayRequests.push(() => getDailyEnergyStatsCached(dateStr, d));
     }
 
-    const dayResults = await Promise.all(dayPromises);
+    const dayResults = [];
+    for (let i = 0; i < dayRequests.length; i += chunkSize) {
+      const chunk = dayRequests.slice(i, i + chunkSize).map((req) => req());
+      const chunkResults = await Promise.all(chunk);
+      dayResults.push(...chunkResults);
+    }
 
     let monthSum = 0;
     let hasData = false;
@@ -507,28 +534,22 @@ async function generateLifetimeGraph(selectedYear) {
       }
     });
 
-    completedMonths += 1;
-    statusText.innerText = `Calculated ${completedMonths}/${monthList.length} month(s) for ${activeYear}...`;
+    statusText.innerText = `Calculated ${monthIndex + 1}/${monthList.length} month(s) for ${activeYear}...`;
 
     if (hasData) {
       const monthName = new Date(mData.year, mData.month - 1).toLocaleString('default', { month: 'long' });
-      return {
+      monthlyTotals.push({
         label: `${monthName.substring(0, 3)} ${mData.year}`,
-        value: monthSum
-      };
+        value: monthSum,
+        year: mData.year,
+        month: mData.month
+      });
     }
-    return null;
-  });
-
-  const monthResults = await Promise.all(monthTasks);
-  monthResults.forEach((m) => {
-    if (m) monthlyTotals.push(m);
-  });
+  }
 
   monthlyTotals.sort((a, b) => {
-    const da = new Date(a.label);
-    const db = new Date(b.label);
-    return da - db;
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
   });
 
   loader.style.display = 'none';
