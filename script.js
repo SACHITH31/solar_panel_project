@@ -827,11 +827,15 @@ async function downloadDashboardSection() {
   const mainArea = document.getElementById("download-area");
   const eventsArea = document.getElementById("events");
   const monthlyContainer = document.getElementById("monthlyBarChartContainer");
+  const monthLoader = document.getElementById("monthLoader");
+  const monthlyEnergyContainer = document.getElementById("monthlyEnergyChartContainer");
   
   // Specific elements for the Last Bar Graph (Lifetime)
   const lifetimeChart = document.getElementById("lifetimeChartDiv");
   const lifetimeLoader = document.getElementById("lifetimeLoader");
   const lifetimeStatusText = document.getElementById("lifetimeStatusText");
+  const lifetimeRangeText = document.getElementById("lifetimeRangeText");
+  const yearSelect = document.getElementById("yearSelect");
 
   const mvMonth = document.getElementById("mvMonth");
   const mvYear = document.getElementById("mvYear");
@@ -847,7 +851,9 @@ async function downloadDashboardSection() {
                             (lifetimeChart && lifetimeChart.style.display === "none") ||
                             (lifetimeStatusText && lifetimeStatusText.innerText.toLowerCase().includes("fetching"));
 
-  if (isTopFetching || isLastBarFetching) {
+  const isMonthViewFetching = (monthLoader && monthLoader.style.display !== "none");
+
+  if (isTopFetching || isLastBarFetching || isMonthViewFetching) {
     alert("⚠️ Data Fetching in Progress...\n\nPlease wait until all graphs are visible on your screen before downloading the PDF.");
     return; 
   }
@@ -958,9 +964,18 @@ async function downloadDashboardSection() {
 
     // 3. Add Lifetime Title
     const lifeTitle = document.createElement("div");
-    lifeTitle.innerText = "LIFETIME ENERGY GENERATION HISTORY"; // Matching style in 2nd image
+    lifeTitle.innerText = yearSelect && yearSelect.value
+      ? `MONTHLY SOLAR ENERGY (${yearSelect.value})`
+      : "MONTHLY SOLAR ENERGY (SELECTED PERIOD)";
     lifeTitle.style.cssText = "font-size:22px; font-weight:bold; margin-bottom:20px; color:#8b5cf6; text-transform: uppercase;";
     finalWrapper.appendChild(lifeTitle);
+
+    const lifeSubTitle = document.createElement("div");
+    lifeSubTitle.innerText = (lifetimeRangeText && lifetimeRangeText.innerText)
+      ? lifetimeRangeText.innerText
+      : "This chart shows month-wise solar energy generated for the selected period.";
+    lifeSubTitle.style.cssText = "font-size:14px; margin-bottom:16px; color:#4b5563; text-align:center;";
+    finalWrapper.appendChild(lifeSubTitle);
 
     // 4. Add Lifetime Graph
     if (lifetimeChart) {
