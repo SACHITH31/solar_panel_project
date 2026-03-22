@@ -12,6 +12,7 @@ let lastDataTable = null;
 let lifetimeChartInstance = null;
 let lifetimeYearFilterInitialized = false;
 const lifetimeDayCache = new Map();
+const LIFETIME_CACHE_PREFIX = "lifetimeMonthlyTotals";
 const detectedEventSet = new Set();
 
 const METRIC_COLUMNS = [
@@ -24,6 +25,47 @@ const METRIC_COLUMNS = [
 ];
 
 google.charts.setOnLoadCallback(init);
+
+function getLifetimeCacheKey(year) {
+  return `${LIFETIME_CACHE_PREFIX}:${year}`;
+}
+
+function readLifetimeCache(year) {
+  try {
+    const raw = localStorage.getItem(getLifetimeCacheKey(year));
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function writeLifetimeCache(year, payload) {
+  try {
+    localStorage.setItem(getLifetimeCacheKey(year), JSON.stringify(payload));
+  } catch (error) {
+    // Ignore storage failures and continue with in-memory behavior.
+  }
+}
+
+function isLifetimeCacheFresh(cacheEntry, activeYear, today) {
+  if (!cacheEntry || !Array.isArray(cacheEntry.monthlyTotals)) return false;
+  if (activeYear !== today.getFullYear()) return true;
+
+  return (
+    cacheEntry.coveredMonth === today.getMonth() + 1 &&
+    cacheEntry.coveredDay === today.getDate()
+  );
+}
+
+function showBarGraphLoader(container, message) {
+  if (!container) return;
+  container.innerHTML = `
+    <div class="bar-graph-loader" aria-live="polite">
+      <div class="bar-graph-loader-spinner"></div>
+      <div class="bar-graph-loader-text">${message || "Loading chart..."}</div>
+    </div>
+  `;
+}
 
 /* ---------- INIT ---------- */
 function init() {
@@ -178,12 +220,18 @@ async function handleMonthViewRequest() {
   const loader = document.getElementById("monthLoader");
   const mainContainer = document.getElementById("monthlyBarChartContainer");
   const energyContainer = document.getElementById("monthlyEnergyChartContainer");
+  const monthlyBarChart = document.getElementById("monthlyBarChart");
+  const monthlyEnergyChart = document.getElementById("monthlyEnergyChart");
   const oopsMsg = document.getElementById("oopsMessage");
 
   if (oopsMsg) oopsMsg.style.display = "none";
   loader.style.display = "block";
-  mainContainer.style.display = "none";
-  if (energyContainer) energyContainer.style.display = "none";
+  mainContainer.style.display = "block";
+  showBarGraphLoader(monthlyBarChart, "Loading monthly peak power chart...");
+  if (energyContainer && monthlyEnergyChart) {
+    energyContainer.style.display = "block";
+    showBarGraphLoader(monthlyEnergyChart, "Loading monthly energy chart...");
+  }
 
   const month = parseInt(document.getElementById("mvMonth").value);
   const year = parseInt(document.getElementById("mvYear").value);
@@ -210,6 +258,10 @@ async function handleMonthViewRequest() {
   loader.style.display = "none";
 
   if (results.length === 0) {
+    if (monthlyBarChart) monthlyBarChart.innerHTML = "";
+    if (monthlyEnergyChart) monthlyEnergyChart.innerHTML = "";
+    mainContainer.style.display = "none";
+    if (energyContainer) energyContainer.style.display = "none";
     if (oopsMsg) oopsMsg.style.display = "block";
     return;
   }
@@ -456,6 +508,7 @@ async function generateLifetimeGraph(selectedYear) {
     Number.isInteger(selectedYear) && selectedYear >= startYear && selectedYear <= currentYear
       ? selectedYear
       : (currentYear < startYear ? startYear : currentYear);
+  const cachedLifetimeData = readLifetimeCache(activeYear);
 
   const monthList = [];
   const startMonth = activeYear === startYear ? startDate.getMonth() + 1 : 1;
@@ -465,6 +518,15 @@ async function generateLifetimeGraph(selectedYear) {
     const fromLabel = new Date(activeYear, startMonth - 1, 1).toLocaleString("en", { month: "short" });
     const toLabel = new Date(activeYear, endMonth - 1, 1).toLocaleString("en", { month: "short" });
     rangeText.textContent = `Showing ${activeYear} data (${fromLabel} to ${toLabel})`;
+  }
+
+  chartDiv.style.display = 'block';
+  showBarGraphLoader(chartDiv, "Loading monthly energy generation chart...");
+
+  if (isLifetimeCacheFresh(cachedLifetimeData, activeYear, today)) {
+    loader.style.display = 'none';
+    drawLifetimeChart(cachedLifetimeData.monthlyTotals);
+    return;
   }
 
   for (let month = startMonth; month <= endMonth; month++) {
@@ -550,6 +612,13 @@ async function generateLifetimeGraph(selectedYear) {
   monthlyTotals.sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
     return a.month - b.month;
+  });
+
+  writeLifetimeCache(activeYear, {
+    monthlyTotals,
+    coveredMonth: endMonth,
+    coveredDay: activeYear === currentYear ? today.getDate() : null,
+    savedAt: new Date().toISOString()
   });
 
   loader.style.display = 'none';
