@@ -497,9 +497,6 @@ async function generateLifetimeGraph(selectedYear) {
   const chartDiv = document.getElementById('lifetimeChartDiv');
   const rangeText = document.getElementById('lifetimeRangeText');
 
-  loader.style.display = 'block';
-  chartDiv.style.display = 'none';
-
   const startDate = new Date(START_DATE_STR);
   const today = new Date();
   const startYear = startDate.getFullYear();
@@ -520,13 +517,25 @@ async function generateLifetimeGraph(selectedYear) {
     rangeText.textContent = `Showing ${activeYear} data (${fromLabel} to ${toLabel})`;
   }
 
-  chartDiv.style.display = 'block';
-  showBarGraphLoader(chartDiv, "Loading monthly energy generation chart...");
-
   if (isLifetimeCacheFresh(cachedLifetimeData, activeYear, today)) {
+    chartDiv.style.display = 'block';
     loader.style.display = 'none';
     drawLifetimeChart(cachedLifetimeData.monthlyTotals);
     return;
+  }
+
+  const hasCachedChart = cachedLifetimeData && Array.isArray(cachedLifetimeData.monthlyTotals) && cachedLifetimeData.monthlyTotals.length > 0;
+
+  if (hasCachedChart) {
+    chartDiv.style.display = 'block';
+    drawLifetimeChart(cachedLifetimeData.monthlyTotals);
+    loader.style.display = 'block';
+    statusText.innerText = `Showing saved ${activeYear} data. Refreshing latest values...`;
+  } else {
+    loader.style.display = 'block';
+    statusText.innerText = `Calculating data for ${activeYear}...`;
+    chartDiv.style.display = 'block';
+    showBarGraphLoader(chartDiv, "Loading monthly energy generation chart...");
   }
 
   for (let month = startMonth; month <= endMonth; month++) {
