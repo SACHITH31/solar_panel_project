@@ -50,12 +50,49 @@ function writeLifetimeCache(year, payload) {
 
 function isLifetimeCacheFresh(cacheEntry, activeYear, today) {
   if (!cacheEntry || !Array.isArray(cacheEntry.monthlyTotals)) return false;
+  const normalizedMonthlyTotals = normalizeLifetimeMonthlyTotals(
+    cacheEntry.monthlyTotals,
+    activeYear,
+    today
+  );
   if (activeYear !== today.getFullYear()) return true;
 
   return (
+    normalizedMonthlyTotals.some(
+      (item) => item.year === activeYear && item.month === today.getMonth() + 1
+    ) &&
     cacheEntry.coveredMonth === today.getMonth() + 1 &&
     cacheEntry.coveredDay === today.getDate()
   );
+}
+
+function normalizeLifetimeMonthlyTotals(monthlyTotals, activeYear, today) {
+  if (!Array.isArray(monthlyTotals)) return [];
+
+  const normalizedTotals = [...monthlyTotals];
+  const currentMonth = today.getMonth() + 1;
+  const hasCurrentMonth =
+    activeYear === today.getFullYear() &&
+    normalizedTotals.some(
+      (item) => item.year === activeYear && item.month === currentMonth
+    );
+
+  if (!hasCurrentMonth && activeYear === today.getFullYear()) {
+    const monthName = new Date(activeYear, currentMonth - 1, 1).toLocaleString("default", { month: "long" });
+    normalizedTotals.push({
+      label: `${monthName.substring(0, 3)} ${activeYear}`,
+      value: 0,
+      year: activeYear,
+      month: currentMonth
+    });
+  }
+
+  normalizedTotals.sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  return normalizedTotals;
 }
 
 function showBarGraphLoader(container, message) {
@@ -510,6 +547,9 @@ async function generateLifetimeGraph(selectedYear) {
       ? selectedYear
       : (currentYear < startYear ? startYear : currentYear);
   const cachedLifetimeData = readLifetimeCache(activeYear);
+  const normalizedCachedMonthlyTotals = cachedLifetimeData
+    ? normalizeLifetimeMonthlyTotals(cachedLifetimeData.monthlyTotals, activeYear, today)
+    : [];
 
   const monthList = [];
   const startMonth = activeYear === startYear ? startDate.getMonth() + 1 : 1;
@@ -524,15 +564,15 @@ async function generateLifetimeGraph(selectedYear) {
   if (isLifetimeCacheFresh(cachedLifetimeData, activeYear, today)) {
     chartDiv.style.display = 'block';
     loader.style.display = 'none';
-    drawLifetimeChart(cachedLifetimeData.monthlyTotals);
+    drawLifetimeChart(normalizedCachedMonthlyTotals);
     return;
   }
 
-  const hasCachedChart = cachedLifetimeData && Array.isArray(cachedLifetimeData.monthlyTotals) && cachedLifetimeData.monthlyTotals.length > 0;
+  const hasCachedChart = normalizedCachedMonthlyTotals.length > 0;
 
   if (hasCachedChart) {
     chartDiv.style.display = 'block';
-    drawLifetimeChart(cachedLifetimeData.monthlyTotals);
+    drawLifetimeChart(normalizedCachedMonthlyTotals);
     loader.style.display = 'block';
     statusText.innerText = `Showing saved ${activeYear} data. Refreshing latest values...`;
   } else {
@@ -611,7 +651,7 @@ async function generateLifetimeGraph(selectedYear) {
 
     statusText.innerText = `Calculated ${monthIndex + 1}/${monthList.length} month(s) for ${activeYear}...`;
 
-    if (hasData) {
+    if (hasData || (mData.year === currentYear && mData.month === today.getMonth() + 1)) {
       const monthName = new Date(mData.year, mData.month - 1).toLocaleString('default', { month: 'long' });
       monthlyTotals.push({
         label: `${monthName.substring(0, 3)} ${mData.year}`,
@@ -627,8 +667,14 @@ async function generateLifetimeGraph(selectedYear) {
     return a.month - b.month;
   });
 
-  writeLifetimeCache(activeYear, {
+  const normalizedMonthlyTotals = normalizeLifetimeMonthlyTotals(
     monthlyTotals,
+    activeYear,
+    today
+  );
+
+  writeLifetimeCache(activeYear, {
+    monthlyTotals: normalizedMonthlyTotals,
     coveredMonth: endMonth,
     coveredDay: activeYear === currentYear ? today.getDate() : null,
     savedAt: new Date().toISOString()
@@ -636,7 +682,7 @@ async function generateLifetimeGraph(selectedYear) {
 
   loader.style.display = 'none';
   chartDiv.style.display = 'block';
-  drawLifetimeChart(monthlyTotals);
+  drawLifetimeChart(normalizedMonthlyTotals);
 }
 
 function drawLifetimeChart(dataArr) {
