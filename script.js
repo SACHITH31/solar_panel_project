@@ -12,8 +12,13 @@ let lastDataTable = null;
 let lastLifetimeChartData = null;
 let lifetimeChartInstance = null;
 let lifetimeYearFilterInitialized = false;
+let latestMonthViewRequestId = 0;
+let latestLifetimeGraphRequestId = 0;
 const lifetimeDayCache = new Map();
 const LIFETIME_CACHE_PREFIX = "lifetimeMonthlyTotals";
+const LIFETIME_CACHE_VERSION = 1;
+const LIFETIME_CACHE_TTL_CURRENT_YEAR_MS = 6 * 60 * 60 * 1000;
+const LIFETIME_CACHE_TTL_PAST_YEAR_MS = 7 * 24 * 60 * 60 * 1000;
 const detectedEventSet = new Set();
 
 const METRIC_COLUMNS = [
@@ -76,7 +81,20 @@ function getLifetimeCacheKey(year) {
 function readLifetimeCache(year) {
   try {
     const raw = localStorage.getItem(getLifetimeCacheKey(year));
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.version !== LIFETIME_CACHE_VERSION) {
+      localStorage.removeItem(getLifetimeCacheKey(year));
+      return null;
+    }
+
+    if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+      localStorage.removeItem(getLifetimeCacheKey(year));
+      return null;
+    }
+
+    return parsed;
   } catch (error) {
     return null;
   }
@@ -88,6 +106,23 @@ function writeLifetimeCache(year, payload) {
   } catch (error) {
     // Ignore storage failures and continue with in-memory behavior.
   }
+}
+
+function buildLifetimeCachePayload(year, monthlyTotals, coveredMonth, coveredDay) {
+  const currentYear = new Date().getFullYear();
+  const ttl =
+    year === currentYear
+      ? LIFETIME_CACHE_TTL_CURRENT_YEAR_MS
+      : LIFETIME_CACHE_TTL_PAST_YEAR_MS;
+
+  return {
+    version: LIFETIME_CACHE_VERSION,
+    monthlyTotals,
+    coveredMonth,
+    coveredDay,
+    savedAt: new Date().toISOString(),
+    expiresAt: Date.now() + ttl
+  };
 }
 
 function isLifetimeCacheFresh(cacheEntry, activeYear, today) {
@@ -319,6 +354,7 @@ function drawChart(data) {
 
 /* ---------- FAST MONTH VIEW (EXISTING) ---------- */
 async function handleMonthViewRequest() {
+  const requestId = ++latestMonthViewRequestId;
   const loader = document.getElementById("monthLoader");
   const mainContainer = document.getElementById("monthlyBarChartContainer");
   const energyContainer = document.getElementById("monthlyEnergyChartContainer");
@@ -356,6 +392,8 @@ async function handleMonthViewRequest() {
   const results = (await resolveDailyRequestsInChunks(dayRequests))
     .filter((r) => r !== null)
     .sort((a, b) => a.dayNum - b.dayNum);
+
+  if (requestId !== latestMonthViewRequestId) return;
 
   loader.style.display = "none";
 
@@ -594,6 +632,7 @@ function setupLifetimeYearFilterUI() {
 }
 
 async function generateLifetimeGraph(selectedYear) {
+  const requestId = ++latestLifetimeGraphRequestId;
   const loader = document.getElementById('lifetimeLoader');
   const statusText = document.getElementById('lifetimeStatusText');
   const chartDiv = document.getElementById('lifetimeChartDiv');
@@ -685,6 +724,7 @@ async function generateLifetimeGraph(selectedYear) {
     }
 
     const dayResults = await resolveDailyRequestsInChunks(dayRequests, chunkSize);
+    if (requestId !== latestLifetimeGraphRequestId) return;
 
     let monthSum = 0;
     let hasData = false;
@@ -719,12 +759,17 @@ async function generateLifetimeGraph(selectedYear) {
     today
   );
 
-  writeLifetimeCache(activeYear, {
-    monthlyTotals: normalizedMonthlyTotals,
-    coveredMonth: endMonth,
-    coveredDay: activeYear === currentYear ? today.getDate() : null,
-    savedAt: new Date().toISOString()
-  });
+  if (requestId !== latestLifetimeGraphRequestId) return;
+
+  writeLifetimeCache(
+    activeYear,
+    buildLifetimeCachePayload(
+      activeYear,
+      normalizedMonthlyTotals,
+      endMonth,
+      activeYear === currentYear ? today.getDate() : null
+    )
+  );
 
   loader.style.display = 'none';
   chartDiv.style.display = 'block';
