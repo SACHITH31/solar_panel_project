@@ -9,6 +9,7 @@ const START_DATE_STR = "2025-11-22";
 
 let pollingTimer = null;
 let lastDataTable = null;
+let lastLifetimeChartData = null;
 let lifetimeChartInstance = null;
 let lifetimeYearFilterInitialized = false;
 const lifetimeDayCache = new Map();
@@ -87,6 +88,9 @@ function init() {
 
   window.addEventListener("resize", () => {
     if (lastDataTable) drawChart(lastDataTable);
+    if (lastLifetimeChartData && document.getElementById("lifetimeChartDiv").style.display !== "none") {
+      drawLifetimeChart(lastLifetimeChartData);
+    }
   });
 
   document.getElementById("monthViewBtn").addEventListener("click", () => {
@@ -637,6 +641,10 @@ async function generateLifetimeGraph(selectedYear) {
 
 function drawLifetimeChart(dataArr) {
     const chartDiv = document.getElementById('lifetimeChartDiv');
+    const isMobile = window.innerWidth <= 768;
+    const isTablet = window.innerWidth > 768 && window.innerWidth <= 1024;
+    lastLifetimeChartData = dataArr;
+
     if (lifetimeChartInstance && typeof lifetimeChartInstance.destroy === "function") {
       lifetimeChartInstance.destroy();
     }
@@ -680,28 +688,32 @@ function drawLifetimeChart(dataArr) {
     title: 'Total Energy Generated per Month (Cumulative)',
     legend: { position: 'none' },
     colors: ['#ea7f1b'],
-    height: 500, // Keep your tall height
-    bar: { groupWidth: '60%' },
+    height: isMobile ? 360 : (isTablet ? 420 : 500),
+    bar: { groupWidth: isMobile ? '72%' : '60%' },
     vAxis: { 
         title: 'Energy (kWh)',
         minValue: 0,
-        gridlines: { count: 6 }
+        gridlines: { count: isMobile ? 4 : 6 },
+        textStyle: { fontSize: isMobile ? 10 : 12 },
+        titleTextStyle: { fontSize: isMobile ? 12 : 14 }
     },
     hAxis: {
         title: 'Month',
         titlePosition: 'out',
         // Bold and slightly larger font helps it show up
-        titleTextStyle: { italic: false, bold: true, fontSize: 14 }, 
-        textStyle: { fontSize: 12 }
+        titleTextStyle: { italic: false, bold: true, fontSize: isMobile ? 12 : 14 }, 
+        textStyle: { fontSize: isMobile ? 10 : 12 },
+        slantedText: isMobile,
+        slantedTextAngle: isMobile ? 32 : 0
     },
     // ADJUSTED CHART AREA:
     // We reduced the internal chart height from 75% to 65% 
     // and increased the bottom margin from 15% to 25%
     chartArea: { 
-        width: '85%', 
-        height: '65%', 
-        top: '10%', 
-        bottom: '25%' 
+        width: isMobile ? '82%' : '85%', 
+        height: isMobile ? '58%' : '65%', 
+        top: isMobile ? '12%' : '10%', 
+        bottom: isMobile ? '28%' : '25%' 
     },
     animation: {
         startup: true,

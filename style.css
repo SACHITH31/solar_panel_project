@@ -817,10 +817,12 @@ option {
 
 #lifetime-stats h3 {
   margin-bottom: 10px;
+  font-size: clamp(1.5rem, 2vw, 2rem);
 }
 
 #lifetimeRangeText {
   margin-bottom: 14px;
+  font-size: clamp(0.95rem, 1.2vw, 1rem);
 }
 
 #lifetimeLoader {
@@ -874,19 +876,61 @@ option {
 }
 
 @media (max-width: 768px) {
+  #lifetime-stats {
+    padding: 18px 14px 10px;
+    border-radius: 18px;
+  }
+
+  #lifetime-stats h3 {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  #lifetimeRangeText {
+    text-align: center;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+
+  #lifetimeLoader {
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+    padding: 8px 0 2px !important;
+  }
+
+  #lifetimeChartDiv {
+    min-height: 380px;
+    padding: 4px 0 14px;
+  }
+
   #lifetimeYearFilterContainer {
     width: 100%;
     max-width: 340px;
     justify-content: center;
+    padding: 10px;
+    gap: 8px;
   }
 
   #lifetimeYearFilterContainer #yearSelect {
-    width: auto !important;
-    min-width: 120px;
+    flex: 1;
+    width: 100% !important;
+    min-width: 0;
   }
 
   #lifetimeYearFilterContainer #yearFilterBtn {
     width: auto !important;
+    min-width: 84px;
+  }
+}
+
+@media (max-width: 480px) {
+  #lifetime-stats {
+    padding: 16px 12px 8px;
+  }
+
+  #lifetimeChartDiv {
+    min-height: 340px;
   }
 }
 
