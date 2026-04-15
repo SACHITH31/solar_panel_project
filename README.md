@@ -150,6 +150,43 @@ JavaScript parsing and calculations
 Charts + cards + tables + PDF export
 ```
 
+### Visual architecture diagram
+
+```text
++-----------------------------+
+|  Google Sheets Data Source  |
+|  Daily solar sheet entries  |
++-------------+---------------+
+              |
+              v
++-----------------------------+
+|  Data Access Layer          |
+|  - Google Visualization API |
+|  - CSV fetch for day data   |
++-------------+---------------+
+              |
+              v
++-----------------------------+
+|  Application Logic          |
+|  script.js                  |
+|  - parsing                  |
+|  - validation               |
+|  - calculations             |
+|  - caching                  |
+|  - event detection          |
++------+------+---------------+
+       |      |
+       |      +----------------------+
+       |                             |
+       v                             v
++-------------------+      +----------------------+
+|  UI Rendering     |      |  Reporting Layer     |
+|  - line charts    |      |  - html2canvas       |
+|  - bar charts     |      |  - jsPDF             |
+|  - cards/tables   |      |  - PDF export        |
++-------------------+      +----------------------+
+```
+
 ## 7. How the Dashboard Works
 
 ### A. Daily dashboard flow
@@ -163,6 +200,19 @@ Charts + cards + tables + PDF export
 - metrics table
 - event alerts
 
+```text
+User selects date
+      |
+      v
+Load Google Sheet for that day
+      |
+      v
+Query required columns
+      |
+      v
+Render daily chart + cards + alerts + metrics
+```
+
 ### B. Month View flow
 
 1. User opens Month View.
@@ -174,6 +224,22 @@ Charts + cards + tables + PDF export
 - total energy for that day
 6. The app renders two column charts.
 
+```text
+Select month/year
+      |
+      v
+Build all dates in selected month
+      |
+      v
+Fetch each day -> validate sheet -> calculate values
+      |
+      v
++-----------------------------+
+|  Output 1: Peak Power Chart |
+|  Output 2: Energy Chart     |
++-----------------------------+
+```
+
 ### C. Lifetime / yearly graph flow
 
 1. User selects a year.
@@ -183,6 +249,23 @@ Charts + cards + tables + PDF export
 5. The app sums energy month-wise.
 6. The app renders the monthly energy chart.
 7. The app stores the result in local storage for faster reuse.
+
+```text
+Select year
+   |
+   v
+Check local cache
+   |
+   +------ Yes, valid ------> Render chart immediately
+   |
+   +------ No / expired ----> Fetch day data month by month
+                               |
+                               v
+                        Sum monthly totals
+                               |
+                               v
+                        Render chart + save cache
+```
 
 ## 8. Engineering Calculations Used
 
@@ -255,6 +338,20 @@ To make this application safer for production use, the following protections are
 - Current month is preserved in the yearly chart even when its value is zero
 
 ## 11. User Guide
+
+### Quick use diagram
+
+```text
+Open dashboard
+   |
+   +--> Choose a date -> View daily analytics
+   |
+   +--> Open Month View -> Select month/year -> View daily monthly charts
+   |
+   +--> Select year in Monthly Energy Generation -> View yearly monthly totals
+   |
+   +--> Click Download PDF -> Export current report
+```
 
 ### Open the dashboard
 Open `index.html` in a browser with internet access.
@@ -339,7 +436,21 @@ It already supports:
 
 In short, this project helps users move from raw solar readings to understandable engineering insights.
 
-## 16. Institution Note
+## 16. Optional README Enhancements
+
+If this README will be used for project submission, demo presentation, or GitHub portfolio display, you can also attach:
+- Dashboard screenshot
+- Month View screenshot
+- Monthly Energy Generation screenshot
+- Sample exported PDF screenshot
+
+Recommended screenshot labels:
+- `Figure 1: Daily Solar Dashboard`
+- `Figure 2: Month View Analysis`
+- `Figure 3: Year-wise Monthly Energy Generation`
+- `Figure 4: Exported PDF Report`
+
+## 17. Institution Note
 
 Prepared for:
 
