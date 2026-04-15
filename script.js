@@ -27,6 +27,48 @@ const METRIC_COLUMNS = [
 
 google.charts.setOnLoadCallback(init);
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseCsvRow(row) {
+  const cols = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < row.length; i++) {
+    const char = row[i];
+    const nextChar = row[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      cols.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  cols.push(current);
+  return cols;
+}
+
+function getTodayDate() {
+  const now = new Date();
+  const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return localNow.toISOString().split("T")[0];
+}
+
+function isDateInRange(dStr) {
+  return dStr >= START_DATE_STR && dStr <= getTodayDate();
+}
+
 function getLifetimeCacheKey(year) {
   return `${LIFETIME_CACHE_PREFIX}:${year}`;
 }
@@ -103,6 +145,25 @@ function showBarGraphLoader(container, message) {
       <div class="bar-graph-loader-text">${message || "Loading chart..."}</div>
     </div>
   `;
+}
+
+async function fetchDailyEnergyStatsWithRetry(dateStr, dayNum, maxAttempts = 3) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const result = await fetchDailyEnergyStats(dateStr, dayNum);
+    if (result) return result;
+    if (attempt < maxAttempts) await sleep(120 * attempt);
+  }
+  return null;
+}
+
+async function resolveDailyRequestsInChunks(requests, chunkSize = 7) {
+  const results = [];
+  for (let i = 0; i < requests.length; i += chunkSize) {
+    const chunk = requests.slice(i, i + chunkSize).map((request) => request());
+    const chunkResults = await Promise.all(chunk);
+    results.push(...chunkResults);
+  }
+  return results;
 }
 
 /* ---------- INIT ---------- */
@@ -283,16 +344,16 @@ async function handleMonthViewRequest() {
       ? today.getDate()
       : daysInMonth;
 
-  const dayPromises = [];
+  const dayRequests = [];
 
   for (let d = 1; d <= maxDay; d++) {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(
       d
     ).padStart(2, "0")}`;
-    dayPromises.push(fetchDailyEnergyStats(dateStr, d));
+    dayRequests.push(() => fetchDailyEnergyStatsWithRetry(dateStr, d));
   }
 
-  const results = (await Promise.all(dayPromises))
+  const results = (await resolveDailyRequestsInChunks(dayRequests))
     .filter((r) => r !== null)
     .sort((a, b) => a.dayNum - b.dayNum);
 
@@ -344,7 +405,7 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
       // 2. DATA VALIDATION (THE BUG FIX)
       // Check if the file content actually matches the requested date.
       // If Google returns the "Main Sheet" by mistake, the dates won't match.
-      const firstRowCols = rows[0].split(",");
+      const firstRowCols = parseCsvRow(rows[0]);
       const fileDateRaw = firstRowCols[0]?.replace(/["\r]/g, ""); // Column A is Timestamp
       
       const fileDate = new Date(fileDateRaw);
@@ -365,7 +426,7 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
       // Get First Value (Start of Day) - LOOP FORWARD
       let firstWh = NaN;
       for (let i = 0; i < rows.length; i++) {
-         const cols = rows[i].split(",");
+         const cols = parseCsvRow(rows[i]);
          const rawVal = cols[26]?.replace(/["\r]/g, "").trim(); // Col AA is Index 26
          
          if (rawVal && rawVal !== "") {
@@ -380,7 +441,7 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
       // Get Last Value (End of Day) - LOOP BACKWARD
       let lastWh = NaN;
       for (let i = rows.length - 1; i >= 0; i--) {
-        const cols = rows[i].split(",");
+        const cols = parseCsvRow(rows[i]);
         const rawVal = cols[26]?.replace(/["\r]/g, "").trim();
         
         if (rawVal && rawVal !== "") {
@@ -404,7 +465,7 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
       // 4. GRAPH 1 LOGIC: Max Power (Watts) from Column B
       let dailyMaxPower = 0;
       rows.forEach((row) => {
-        const cols = row.split(",");
+        const cols = parseCsvRow(row);
         const p = parseFloat(cols[1]?.replace(/["\r]/g, ""));
         if (!isNaN(p) && p > dailyMaxPower) dailyMaxPower = p;
       });
@@ -589,16 +650,6 @@ async function generateLifetimeGraph(selectedYear) {
     });
   }
 
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const fetchDailyEnergyStatsWithRetry = async (dateStr, dayNum, maxAttempts = 3) => {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const result = await fetchDailyEnergyStats(dateStr, dayNum);
-      if (result) return result;
-      if (attempt < maxAttempts) await sleep(120 * attempt);
-    }
-    return null;
-  };
-
   const getDailyEnergyStatsCached = (dateStr, dayNum) => {
     if (!lifetimeDayCache.has(dateStr)) {
       const requestPromise = fetchDailyEnergyStatsWithRetry(dateStr, dayNum).then((result) => {
@@ -633,12 +684,7 @@ async function generateLifetimeGraph(selectedYear) {
       dayRequests.push(() => getDailyEnergyStatsCached(dateStr, d));
     }
 
-    const dayResults = [];
-    for (let i = 0; i < dayRequests.length; i += chunkSize) {
-      const chunk = dayRequests.slice(i, i + chunkSize).map((req) => req());
-      const chunkResults = await Promise.all(chunk);
-      dayResults.push(...chunkResults);
-    }
+    const dayResults = await resolveDailyRequestsInChunks(dayRequests, chunkSize);
 
     let monthSum = 0;
     let hasData = false;
@@ -1162,12 +1208,5 @@ function addPdfHeader(pdf, dateValue, margin) {
   pdf.text(`Reported Date: ${dateValue}`, margin, 27);
 }
 
-function getTodayDate() {
-  return new Date().toISOString().split("T")[0];
-}
-function isDateInRange(dStr) {
-  const d = new Date(dStr);
-  return d >= new Date("2025-11-22") && d <= new Date(getTodayDate());
-}
 
 
