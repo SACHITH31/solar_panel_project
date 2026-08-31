@@ -5,7 +5,7 @@ const SHEET_PREFIX = "EEE Block-1 Solar Data_Slave_1_";
 const POLLING_INTERVAL = 120000;
 
 // NEW: Start Date Configuration
-const START_DATE_STR = "2025-11-22"; 
+const START_DATE_STR = "2025-11-22";
 
 let pollingTimer = null;
 let lastDataTable = null;
@@ -108,7 +108,12 @@ function writeLifetimeCache(year, payload) {
   }
 }
 
-function buildLifetimeCachePayload(year, monthlyTotals, coveredMonth, coveredDay) {
+function buildLifetimeCachePayload(
+  year,
+  monthlyTotals,
+  coveredMonth,
+  coveredDay,
+) {
   const currentYear = new Date().getFullYear();
   const ttl =
     year === currentYear
@@ -121,7 +126,7 @@ function buildLifetimeCachePayload(year, monthlyTotals, coveredMonth, coveredDay
     coveredMonth,
     coveredDay,
     savedAt: new Date().toISOString(),
-    expiresAt: Date.now() + ttl
+    expiresAt: Date.now() + ttl,
   };
 }
 
@@ -130,13 +135,13 @@ function isLifetimeCacheFresh(cacheEntry, activeYear, today) {
   const normalizedMonthlyTotals = normalizeLifetimeMonthlyTotals(
     cacheEntry.monthlyTotals,
     activeYear,
-    today
+    today,
   );
   if (activeYear !== today.getFullYear()) return true;
 
   return (
     normalizedMonthlyTotals.some(
-      (item) => item.year === activeYear && item.month === today.getMonth() + 1
+      (item) => item.year === activeYear && item.month === today.getMonth() + 1,
     ) &&
     cacheEntry.coveredMonth === today.getMonth() + 1 &&
     cacheEntry.coveredDay === today.getDate()
@@ -151,16 +156,19 @@ function normalizeLifetimeMonthlyTotals(monthlyTotals, activeYear, today) {
   const hasCurrentMonth =
     activeYear === today.getFullYear() &&
     normalizedTotals.some(
-      (item) => item.year === activeYear && item.month === currentMonth
+      (item) => item.year === activeYear && item.month === currentMonth,
     );
 
   if (!hasCurrentMonth && activeYear === today.getFullYear()) {
-    const monthName = new Date(activeYear, currentMonth - 1, 1).toLocaleString("default", { month: "long" });
+    const monthName = new Date(activeYear, currentMonth - 1, 1).toLocaleString(
+      "default",
+      { month: "long" },
+    );
     normalizedTotals.push({
       label: `${monthName.substring(0, 3)} ${activeYear}`,
       value: 0,
       year: activeYear,
-      month: currentMonth
+      month: currentMonth,
     });
   }
 
@@ -182,7 +190,11 @@ function showBarGraphLoader(container, message) {
   `;
 }
 
-async function fetchDailyEnergyStatsWithRetry(dateStr, dayNum, maxAttempts = 3) {
+async function fetchDailyEnergyStatsWithRetry(
+  dateStr,
+  dayNum,
+  maxAttempts = 3,
+) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const result = await fetchDailyEnergyStats(dateStr, dayNum);
     if (result) return result;
@@ -221,7 +233,10 @@ function init() {
 
   window.addEventListener("resize", () => {
     if (lastDataTable) drawChart(lastDataTable);
-    if (lastLifetimeChartData && document.getElementById("lifetimeChartDiv").style.display !== "none") {
+    if (
+      lastLifetimeChartData &&
+      document.getElementById("lifetimeChartDiv").style.display !== "none"
+    ) {
       drawLifetimeChart(lastLifetimeChartData);
     }
   });
@@ -270,11 +285,11 @@ function loadData(dateValue) {
   const sheetName = SHEET_PREFIX + dateValue;
   const query = new google.visualization.Query(
     `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
-      sheetName
-    )}`
+      sheetName,
+    )}`,
   );
   query.setQuery(
-    `SELECT A, B, F, J, N, V, Z, AA, AB WHERE A IS NOT NULL AND B IS NOT NULL`
+    `SELECT A, B, F, J, N, V, Z, AA, AB WHERE A IS NOT NULL AND B IS NOT NULL`,
   );
 
   query.send((response) => {
@@ -334,7 +349,7 @@ function drawChart(data) {
   view.setColumns([0, 1, annotationCol, annotationTextCol]);
 
   const chart = new google.visualization.LineChart(
-    document.getElementById("chart_div")
+    document.getElementById("chart_div"),
   );
   chart.draw(view, {
     title: "SOLAR POWER GENERATION (Watts)",
@@ -357,7 +372,9 @@ async function handleMonthViewRequest() {
   const requestId = ++latestMonthViewRequestId;
   const loader = document.getElementById("monthLoader");
   const mainContainer = document.getElementById("monthlyBarChartContainer");
-  const energyContainer = document.getElementById("monthlyEnergyChartContainer");
+  const energyContainer = document.getElementById(
+    "monthlyEnergyChartContainer",
+  );
   const monthlyBarChart = document.getElementById("monthlyBarChart");
   const monthlyEnergyChart = document.getElementById("monthlyEnergyChart");
   const oopsMsg = document.getElementById("oopsMessage");
@@ -384,7 +401,7 @@ async function handleMonthViewRequest() {
 
   for (let d = 1; d <= maxDay; d++) {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(
-      d
+      d,
     ).padStart(2, "0")}`;
     dayRequests.push(() => fetchDailyEnergyStatsWithRetry(dateStr, d));
   }
@@ -419,7 +436,7 @@ async function handleMonthViewRequest() {
 function fetchDailyEnergyStats(dateStr, dayNum) {
   const sheetName = SHEET_PREFIX + dateStr;
   const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
-    sheetName
+    sheetName,
   )}`;
 
   return fetch(url)
@@ -430,7 +447,7 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
     .then((text) => {
       // 1. Basic Validity Checks
       if (!text || text.trim() === "" || text.includes("<!DOCTYPE html>")) {
-         return null;
+        return null;
       }
 
       const rows = text
@@ -445,35 +462,35 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
       // If Google returns the "Main Sheet" by mistake, the dates won't match.
       const firstRowCols = parseCsvRow(rows[0]);
       const fileDateRaw = firstRowCols[0]?.replace(/["\r]/g, ""); // Column A is Timestamp
-      
+
       const fileDate = new Date(fileDateRaw);
       const requestedDate = new Date(dateStr);
 
       // Compare Year, Month, and Date
-      const isSameDay = 
-          fileDate.getFullYear() === requestedDate.getFullYear() &&
-          fileDate.getMonth() === requestedDate.getMonth() &&
-          fileDate.getDate() === requestedDate.getDate();
+      const isSameDay =
+        fileDate.getFullYear() === requestedDate.getFullYear() &&
+        fileDate.getMonth() === requestedDate.getMonth() &&
+        fileDate.getDate() === requestedDate.getDate();
 
       if (!isSameDay) {
-          // This prevents the "Random Data" bug
-          return null;
+        // This prevents the "Random Data" bug
+        return null;
       }
 
       // 3. GRAPH 2 LOGIC: Energy (Wh) from Column AA
       // Get First Value (Start of Day) - LOOP FORWARD
       let firstWh = NaN;
       for (let i = 0; i < rows.length; i++) {
-         const cols = parseCsvRow(rows[i]);
-         const rawVal = cols[26]?.replace(/["\r]/g, "").trim(); // Col AA is Index 26
-         
-         if (rawVal && rawVal !== "") {
-             const val = parseFloat(rawVal);
-             if (!isNaN(val)) {
-                 firstWh = val;
-                 break; 
-             }
-         }
+        const cols = parseCsvRow(rows[i]);
+        const rawVal = cols[26]?.replace(/["\r]/g, "").trim(); // Col AA is Index 26
+
+        if (rawVal && rawVal !== "") {
+          const val = parseFloat(rawVal);
+          if (!isNaN(val)) {
+            firstWh = val;
+            break;
+          }
+        }
       }
 
       // Get Last Value (End of Day) - LOOP BACKWARD
@@ -481,13 +498,13 @@ function fetchDailyEnergyStats(dateStr, dayNum) {
       for (let i = rows.length - 1; i >= 0; i--) {
         const cols = parseCsvRow(rows[i]);
         const rawVal = cols[26]?.replace(/["\r]/g, "").trim();
-        
+
         if (rawVal && rawVal !== "") {
-            const val = parseFloat(rawVal);
-            if (!isNaN(val)) {
-                lastWh = val;
-                break; 
-            }
+          const val = parseFloat(rawVal);
+          if (!isNaN(val)) {
+            lastWh = val;
+            break;
+          }
         }
       }
 
@@ -534,9 +551,25 @@ function drawMonthlyEnergyBarChart(dataArr, month, year) {
     legend: "none",
     height: 450,
     colors: ["#10b981"],
-    chartArea: { left: "12%", right: "8%", top: "15%", bottom: "25%", width: "80%" },
-    hAxis: { title: "Date", slantedText: true, slantedTextAngle: 45, showTextEvery: 1 },
-    vAxis: { title: "Units / kWh", minValue: 0, format: "#.##", viewWindow: { min: 0 } },
+    chartArea: {
+      left: "12%",
+      right: "8%",
+      top: "15%",
+      bottom: "25%",
+      width: "80%",
+    },
+    hAxis: {
+      title: "Date",
+      slantedText: true,
+      slantedTextAngle: 45,
+      showTextEvery: 1,
+    },
+    vAxis: {
+      title: "Units / kWh",
+      minValue: 0,
+      format: "#.##",
+      viewWindow: { min: 0 },
+    },
     bar: { groupWidth: "75%" },
   };
 
@@ -567,9 +600,26 @@ function drawMonthlyMaxBarChart(dataArr, month, year) {
     title: `Daily Peak Power Generation - ${month}/${year}`,
     legend: "none",
     height: 400,
-    chartArea: { left: "10%", right: "10%", top: "15%", bottom: "20%", width: "80%", height: "65%" },
-    hAxis: { title: "Date", slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: 11 } },
-    vAxis: { title: "Watts", minValue: 0, gridlines: { count: 6 }, format: "short" },
+    chartArea: {
+      left: "10%",
+      right: "10%",
+      top: "15%",
+      bottom: "20%",
+      width: "80%",
+      height: "65%",
+    },
+    hAxis: {
+      title: "Date",
+      slantedText: true,
+      slantedTextAngle: 45,
+      textStyle: { fontSize: 11 },
+    },
+    vAxis: {
+      title: "Watts",
+      minValue: 0,
+      gridlines: { count: 6 },
+      format: "short",
+    },
     bar: { groupWidth: "75%" },
     colors: ["#1a73e8"],
   };
@@ -633,22 +683,30 @@ function setupLifetimeYearFilterUI() {
 
 async function generateLifetimeGraph(selectedYear) {
   const requestId = ++latestLifetimeGraphRequestId;
-  const loader = document.getElementById('lifetimeLoader');
-  const statusText = document.getElementById('lifetimeStatusText');
-  const chartDiv = document.getElementById('lifetimeChartDiv');
-  const rangeText = document.getElementById('lifetimeRangeText');
+  const loader = document.getElementById("lifetimeLoader");
+  const statusText = document.getElementById("lifetimeStatusText");
+  const chartDiv = document.getElementById("lifetimeChartDiv");
+  const rangeText = document.getElementById("lifetimeRangeText");
 
   const startDate = new Date(START_DATE_STR);
   const today = new Date();
   const startYear = startDate.getFullYear();
   const currentYear = today.getFullYear();
   const activeYear =
-    Number.isInteger(selectedYear) && selectedYear >= startYear && selectedYear <= currentYear
+    Number.isInteger(selectedYear) &&
+    selectedYear >= startYear &&
+    selectedYear <= currentYear
       ? selectedYear
-      : (currentYear < startYear ? startYear : currentYear);
+      : currentYear < startYear
+        ? startYear
+        : currentYear;
   const cachedLifetimeData = readLifetimeCache(activeYear);
   const normalizedCachedMonthlyTotals = cachedLifetimeData
-    ? normalizeLifetimeMonthlyTotals(cachedLifetimeData.monthlyTotals, activeYear, today)
+    ? normalizeLifetimeMonthlyTotals(
+        cachedLifetimeData.monthlyTotals,
+        activeYear,
+        today,
+      )
     : [];
 
   const monthList = [];
@@ -656,14 +714,19 @@ async function generateLifetimeGraph(selectedYear) {
   const endMonth = activeYear === currentYear ? today.getMonth() + 1 : 12;
 
   if (rangeText) {
-    const fromLabel = new Date(activeYear, startMonth - 1, 1).toLocaleString("en", { month: "short" });
-    const toLabel = new Date(activeYear, endMonth - 1, 1).toLocaleString("en", { month: "short" });
+    const fromLabel = new Date(activeYear, startMonth - 1, 1).toLocaleString(
+      "en",
+      { month: "short" },
+    );
+    const toLabel = new Date(activeYear, endMonth - 1, 1).toLocaleString("en", {
+      month: "short",
+    });
     rangeText.textContent = `Showing ${activeYear} data (${fromLabel} to ${toLabel})`;
   }
 
   if (isLifetimeCacheFresh(cachedLifetimeData, activeYear, today)) {
-    chartDiv.style.display = 'block';
-    loader.style.display = 'none';
+    chartDiv.style.display = "block";
+    loader.style.display = "none";
     drawLifetimeChart(normalizedCachedMonthlyTotals);
     return;
   }
@@ -671,27 +734,30 @@ async function generateLifetimeGraph(selectedYear) {
   const hasCachedChart = normalizedCachedMonthlyTotals.length > 0;
 
   if (hasCachedChart) {
-    chartDiv.style.display = 'block';
+    chartDiv.style.display = "block";
     drawLifetimeChart(normalizedCachedMonthlyTotals);
-    loader.style.display = 'block';
+    loader.style.display = "block";
     statusText.innerText = `Showing saved ${activeYear} data. Refreshing latest values...`;
   } else {
-    loader.style.display = 'block';
+    loader.style.display = "block";
     statusText.innerText = `Calculating data for ${activeYear}...`;
-    chartDiv.style.display = 'block';
+    chartDiv.style.display = "block";
     showBarGraphLoader(chartDiv, "Loading monthly energy generation chart...");
   }
 
   for (let month = startMonth; month <= endMonth; month++) {
     monthList.push({
       month,
-      year: activeYear
+      year: activeYear,
     });
   }
 
   const getDailyEnergyStatsCached = (dateStr, dayNum) => {
     if (!lifetimeDayCache.has(dateStr)) {
-      const requestPromise = fetchDailyEnergyStatsWithRetry(dateStr, dayNum).then((result) => {
+      const requestPromise = fetchDailyEnergyStatsWithRetry(
+        dateStr,
+        dayNum,
+      ).then((result) => {
         if (!result) lifetimeDayCache.delete(dateStr);
         return result;
       });
@@ -708,12 +774,12 @@ async function generateLifetimeGraph(selectedYear) {
     const mData = monthList[monthIndex];
 
     let startDay = 1;
-    if (mData.month === (startDate.getMonth() + 1) && mData.year === startYear) {
+    if (mData.month === startDate.getMonth() + 1 && mData.year === startYear) {
       startDay = startDate.getDate();
     }
 
     let endDay = new Date(mData.year, mData.month, 0).getDate();
-    if (mData.month === (today.getMonth() + 1) && mData.year === currentYear) {
+    if (mData.month === today.getMonth() + 1 && mData.year === currentYear) {
       endDay = today.getDate();
     }
 
@@ -723,7 +789,10 @@ async function generateLifetimeGraph(selectedYear) {
       dayRequests.push(() => getDailyEnergyStatsCached(dateStr, d));
     }
 
-    const dayResults = await resolveDailyRequestsInChunks(dayRequests, chunkSize);
+    const dayResults = await resolveDailyRequestsInChunks(
+      dayRequests,
+      chunkSize,
+    );
     if (requestId !== latestLifetimeGraphRequestId) return;
 
     let monthSum = 0;
@@ -737,13 +806,19 @@ async function generateLifetimeGraph(selectedYear) {
 
     statusText.innerText = `Calculated ${monthIndex + 1}/${monthList.length} month(s) for ${activeYear}...`;
 
-    if (hasData || (mData.year === currentYear && mData.month === today.getMonth() + 1)) {
-      const monthName = new Date(mData.year, mData.month - 1).toLocaleString('default', { month: 'long' });
+    if (
+      hasData ||
+      (mData.year === currentYear && mData.month === today.getMonth() + 1)
+    ) {
+      const monthName = new Date(mData.year, mData.month - 1).toLocaleString(
+        "default",
+        { month: "long" },
+      );
       monthlyTotals.push({
         label: `${monthName.substring(0, 3)} ${mData.year}`,
         value: monthSum,
         year: mData.year,
-        month: mData.month
+        month: mData.month,
       });
     }
   }
@@ -756,7 +831,7 @@ async function generateLifetimeGraph(selectedYear) {
   const normalizedMonthlyTotals = normalizeLifetimeMonthlyTotals(
     monthlyTotals,
     activeYear,
-    today
+    today,
   );
 
   if (requestId !== latestLifetimeGraphRequestId) return;
@@ -767,108 +842,114 @@ async function generateLifetimeGraph(selectedYear) {
       activeYear,
       normalizedMonthlyTotals,
       endMonth,
-      activeYear === currentYear ? today.getDate() : null
-    )
+      activeYear === currentYear ? today.getDate() : null,
+    ),
   );
 
-  loader.style.display = 'none';
-  chartDiv.style.display = 'block';
+  loader.style.display = "none";
+  chartDiv.style.display = "block";
   drawLifetimeChart(normalizedMonthlyTotals);
 }
 
 function drawLifetimeChart(dataArr) {
-    const chartDiv = document.getElementById('lifetimeChartDiv');
-    const isMobile = window.innerWidth <= 768;
-    const isTablet = window.innerWidth > 768 && window.innerWidth <= 1024;
-    lastLifetimeChartData = dataArr;
+  const chartDiv = document.getElementById("lifetimeChartDiv");
+  const isMobile = window.innerWidth <= 768;
+  const isTablet = window.innerWidth > 768 && window.innerWidth <= 1024;
+  lastLifetimeChartData = dataArr;
 
-    if (lifetimeChartInstance && typeof lifetimeChartInstance.destroy === "function") {
-      lifetimeChartInstance.destroy();
-    }
-    chartDiv.innerHTML = "";
+  if (
+    lifetimeChartInstance &&
+    typeof lifetimeChartInstance.destroy === "function"
+  ) {
+    lifetimeChartInstance.destroy();
+  }
+  chartDiv.innerHTML = "";
 
-    const dt = new google.visualization.DataTable();
-    dt.addColumn('string', 'Month');
-    dt.addColumn('number', 'Total Generated (kWh)');
-    dt.addColumn({ type: 'number', role: 'annotation' }); 
+  const dt = new google.visualization.DataTable();
+  dt.addColumn("string", "Month");
+  dt.addColumn("number", "Total Generated (kWh)");
+  dt.addColumn({ type: "number", role: "annotation" });
 
-    const rows = dataArr.map(item => [
-        item.label, 
-        item.value, 
-        parseFloat(item.value.toFixed(1)) 
-    ]);
-    
-    dt.addRows(rows);
+  const rows = dataArr.map((item) => [
+    item.label,
+    item.value,
+    parseFloat(item.value.toFixed(1)),
+  ]);
 
-    // const options = {
-    //     title: 'Total Energy Generated per Month (Cumulative)',
-    //     legend: { position: 'none' },
-    //     colors: ['#ea7f1b'],
-    //     height: 500,
-    //     bar: { groupWidth: '60%' },
-    //     vAxis: { 
-    //         title: 'Energy (kWh)',
-    //         minValue: 0,
-    //         gridlines: { count: 6 }
-    //     },
-    //     hAxis: {
-    //         title: 'Month',
-    //     },
-    //     chartArea: { width: '85%', height: '75%', top: '10%', bottom: '15%' },
-    //     animation: {
-    //       startup: true,
-    //       duration: 1000,
-    //       easing: 'out',
-    //     }
-    // };
-    const options = {
-    title: 'Total Energy Generated per Month (Cumulative)',
-    legend: { position: 'none' },
-    colors: ['#ea7f1b'],
-    height: isMobile ? 360 : (isTablet ? 420 : 500),
-    bar: { groupWidth: isMobile ? '72%' : '60%' },
-    vAxis: { 
-        title: 'Energy (kWh)',
-        minValue: 0,
-        gridlines: { count: isMobile ? 4 : 6 },
-        textStyle: { fontSize: isMobile ? 10 : 12 },
-        titleTextStyle: { fontSize: isMobile ? 12 : 14 }
+  dt.addRows(rows);
+
+  // const options = {
+  //     title: 'Total Energy Generated per Month (Cumulative)',
+  //     legend: { position: 'none' },
+  //     colors: ['#ea7f1b'],
+  //     height: 500,
+  //     bar: { groupWidth: '60%' },
+  //     vAxis: {
+  //         title: 'Energy (kWh)',
+  //         minValue: 0,
+  //         gridlines: { count: 6 }
+  //     },
+  //     hAxis: {
+  //         title: 'Month',
+  //     },
+  //     chartArea: { width: '85%', height: '75%', top: '10%', bottom: '15%' },
+  //     animation: {
+  //       startup: true,
+  //       duration: 1000,
+  //       easing: 'out',
+  //     }
+  // };
+  const options = {
+    title: "Total Energy Generated per Month (Cumulative)",
+    legend: { position: "none" },
+    colors: ["#ea7f1b"],
+    height: isMobile ? 360 : isTablet ? 420 : 500,
+    bar: { groupWidth: isMobile ? "72%" : "60%" },
+    vAxis: {
+      title: "Energy (kWh)",
+      minValue: 0,
+      gridlines: { count: isMobile ? 4 : 6 },
+      textStyle: { fontSize: isMobile ? 10 : 12 },
+      titleTextStyle: { fontSize: isMobile ? 12 : 14 },
     },
     hAxis: {
-        title: 'Month',
-        titlePosition: 'out',
-        // Bold and slightly larger font helps it show up
-        titleTextStyle: { italic: false, bold: true, fontSize: isMobile ? 12 : 14 }, 
-        textStyle: { fontSize: isMobile ? 10 : 12 },
-        slantedText: isMobile,
-        slantedTextAngle: isMobile ? 32 : 0
+      title: "Month",
+      titlePosition: "out",
+      // Bold and slightly larger font helps it show up
+      titleTextStyle: {
+        italic: false,
+        bold: true,
+        fontSize: isMobile ? 12 : 14,
+      },
+      textStyle: { fontSize: isMobile ? 10 : 12 },
+      slantedText: isMobile,
+      slantedTextAngle: isMobile ? 32 : 0,
     },
     // ADJUSTED CHART AREA:
-    // We reduced the internal chart height from 75% to 65% 
+    // We reduced the internal chart height from 75% to 65%
     // and increased the bottom margin from 15% to 25%
-    chartArea: { 
-        width: isMobile ? '82%' : '85%', 
-        height: isMobile ? '58%' : '65%', 
-        top: isMobile ? '12%' : '10%', 
-        bottom: isMobile ? '28%' : '25%' 
+    chartArea: {
+      width: isMobile ? "82%" : "85%",
+      height: isMobile ? "58%" : "65%",
+      top: isMobile ? "12%" : "10%",
+      bottom: isMobile ? "28%" : "25%",
     },
     animation: {
-        startup: true,
-        duration: 1000,
-        easing: 'out',
-    }
-};
-    lifetimeChartInstance = new google.visualization.ColumnChart(chartDiv);
-    lifetimeChartInstance.draw(dt, options);
+      startup: true,
+      duration: 1000,
+      easing: "out",
+    },
+  };
+  lifetimeChartInstance = new google.visualization.ColumnChart(chartDiv);
+  lifetimeChartInstance.draw(dt, options);
 }
 
 /* ---------- SUMMARY & METRICS (EXISTING) ---------- */
 function showLiveWatt(data) {
   const last = data.getNumberOfRows() - 1;
   const watt = (data.getValue(last, 1) / 1000).toFixed(2);
-  document.getElementById(
-    "live_watt"
-  ).innerHTML = `⚡ Live Watt : <strong>${watt} kWh</strong>`;
+  document.getElementById("live_watt").innerHTML =
+    `⚡ Live Watt : <strong>${watt} kWh</strong>`;
 }
 
 function showTotalPower(data) {
@@ -877,11 +958,8 @@ function showTotalPower(data) {
     total += data.getValue(i, 1);
   }
   const totalKwh = total / 1000;
-  document.getElementById(
-    "total_power"
-  ).innerHTML = `☀️ Solar Energy Today : <strong>${totalKwh.toFixed(
-    2
-  )} kWh</strong>`;
+  document.getElementById("total_power").innerHTML =
+    `☀️ Solar Energy Today : <strong>${totalKwh.toFixed(2)} kWh</strong>`;
   showCO2Saved(totalKwh);
 }
 
@@ -908,7 +986,7 @@ function updateInverterHealth(data) {
     const healthScore = (100 - dropPercentage).toFixed(1);
     const color = healthScore < 50 ? "#dc2626" : "#f59e0b";
     healthEl.innerHTML = `🟡 Health : <strong style="color:${color}">${healthScore}%</strong> <small>(-${dropPercentage.toFixed(
-      1
+      1,
     )}%)</small>`;
   } else {
     healthEl.innerHTML = `🟢 Inverter Health : <strong>100%</strong>`;
@@ -918,12 +996,84 @@ function updateInverterHealth(data) {
 function updateLatestMetricsTable(data) {
   const tbody = document.querySelector("#latestMetricsTable tbody");
   tbody.innerHTML = "";
+
   METRIC_COLUMNS.forEach((c) => {
+    let value;
+
+    // 1. PF Avg (inst) → Average of non-zero values only
+    if (c.label === "PF Avg (inst)") {
+      let sum = 0;
+      let count = 0;
+
+      for (let i = 0; i < data.getNumberOfRows(); i++) {
+        const v = data.getValue(i, c.index);
+
+        if (v !== null && v !== "" && !isNaN(v) && Number(v) !== 0) {
+          sum += Number(v);
+          count++;
+        }
+      }
+
+      value = count > 0 ? (sum / count).toFixed(4) : "--";
+    }
+
+    // 2. VA Total → Maximum value
+    else if (c.label === "VA Total") {
+      let max = null;
+
+      for (let i = 0; i < data.getNumberOfRows(); i++) {
+        const v = data.getValue(i, c.index);
+
+        if (v !== null && v !== "" && !isNaN(v)) {
+          const num = Number(v);
+
+          if (max === null || num > max) {
+            max = num;
+          }
+        }
+      }
+
+      value = max !== null ? max : "--";
+    }
+
+    // 3. Current Total → Maximum value from Column V
+    else if (c.label === "Current Total") {
+      let max = null;
+      let temp = []
+      let totalSum = 0
+
+      for (let i = 0; i < data.getNumberOfRows(); i++) {
+        const v = data.getValue(i, c.index);
+        temp.push(v)
+        totalSum += v
+
+        if (v !== null && v !== "" && !isNaN(v)) {
+          const num = Number(v);
+
+          // Ignore zero values
+          if (num > 0 && (max === null || num > max)) {
+            max = num;
+          }
+        }
+      }
+      
+      value = max !== null ? max : "--";
+      // console.log("Max Current Total:", max);
+      // console.log(totalSum)
+    }
+
+    // Everything else → Keep existing behavior
+    else {
+      value = getLastNonNullInColumn(data, c.index);
+    }
+
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${c.label}</td><td>${getLastNonNullInColumn(
-      data,
-      c.index
-    )}</td>`;
+
+    tr.innerHTML = `
+      <td>${c.label}</td>
+      <td>${value}</td>
+    `;
+
     tbody.appendChild(tr);
   });
 }
@@ -931,8 +1081,12 @@ function updateLatestMetricsTable(data) {
 function getLastNonNullInColumn(data, col) {
   for (let i = data.getNumberOfRows() - 1; i >= 0; i--) {
     const v = data.getValue(i, col);
-    if (v !== null && v !== "") return v;
+
+    if (v !== null && v !== "") {
+      return v;
+    }
   }
+
   return "--";
 }
 
@@ -1055,8 +1209,10 @@ async function downloadDashboardSection() {
   const eventsArea = document.getElementById("events");
   const monthlyContainer = document.getElementById("monthlyBarChartContainer");
   const monthLoader = document.getElementById("monthLoader");
-  const monthlyEnergyContainer = document.getElementById("monthlyEnergyChartContainer");
-  
+  const monthlyEnergyContainer = document.getElementById(
+    "monthlyEnergyChartContainer",
+  );
+
   // Specific elements for the Last Bar Graph (Lifetime)
   const lifetimeChart = document.getElementById("lifetimeChartDiv");
   const lifetimeLoader = document.getElementById("lifetimeLoader");
@@ -1071,24 +1227,33 @@ async function downloadDashboardSection() {
   // =========================================================
   // 1. THE STRICT GATEKEEPER
   // =========================================================
-  const isTopFetching = mainArea.innerText.toLowerCase().includes("fetching") || 
-                        mainArea.innerText.toLowerCase().includes("please wait");
+  const isTopFetching =
+    mainArea.innerText.toLowerCase().includes("fetching") ||
+    mainArea.innerText.toLowerCase().includes("please wait");
 
-  const isLastBarFetching = (lifetimeLoader && lifetimeLoader.style.display !== "none") || 
-                            (lifetimeChart && lifetimeChart.style.display === "none") ||
-                            (lifetimeStatusText && lifetimeStatusText.innerText.toLowerCase().includes("fetching"));
+  const isLastBarFetching =
+    (lifetimeLoader && lifetimeLoader.style.display !== "none") ||
+    (lifetimeChart && lifetimeChart.style.display === "none") ||
+    (lifetimeStatusText &&
+      lifetimeStatusText.innerText.toLowerCase().includes("fetching"));
 
-  const isMonthViewFetching = (monthLoader && monthLoader.style.display !== "none");
+  const isMonthViewFetching =
+    monthLoader && monthLoader.style.display !== "none";
 
   if (isTopFetching || isLastBarFetching || isMonthViewFetching) {
-    alert("⚠️ Data Fetching in Progress...\n\nPlease wait until all graphs are visible on your screen before downloading the PDF.");
-    return; 
+    alert(
+      "⚠️ Data Fetching in Progress...\n\nPlease wait until all graphs are visible on your screen before downloading the PDF.",
+    );
+    return;
   }
 
   // =========================================================
   // 2. INITIALIZE PDF & SETTINGS
   // =========================================================
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isMobile =
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    );
   btn.disabled = true;
   btnText.innerHTML = `<span class="spinner"></span> Generating Full Report...`;
 
@@ -1099,15 +1264,24 @@ async function downloadDashboardSection() {
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 10;
     const maxLineWidth = pageWidth - margin * 2;
-    const contentMaxHeight = pageHeight - 25; 
+    const contentMaxHeight = pageHeight - 25;
 
-    const isMonthlyActive = monthlyContainer && monthlyContainer.style.display !== "none";
+    const isMonthlyActive =
+      monthlyContainer && monthlyContainer.style.display !== "none";
 
     // --- PAGE 1: DAILY DASHBOARD (Always Included) ---
     const canvasMain = await html2canvas(mainArea, { scale: 2, useCORS: true });
-    if (typeof addPdfHeader === "function") addPdfHeader(pdf, dateValue, margin);
+    if (typeof addPdfHeader === "function")
+      addPdfHeader(pdf, dateValue, margin);
     const mainHeight = (maxLineWidth * canvasMain.height) / canvasMain.width;
-    pdf.addImage(canvasMain.toDataURL("image/jpeg", 0.85), "JPEG", margin, 30, maxLineWidth, mainHeight);
+    pdf.addImage(
+      canvasMain.toDataURL("image/jpeg", 0.85),
+      "JPEG",
+      margin,
+      30,
+      maxLineWidth,
+      mainHeight,
+    );
 
     // =========================================================
     // 3. LOGIC FOR ADDITIONAL PAGES
@@ -1121,48 +1295,85 @@ async function downloadDashboardSection() {
         if (m1) {
           pdf.addPage();
           const cm1 = await html2canvas(m1, { scale: 2 });
-          pdf.addImage(cm1.toDataURL("image/jpeg", 0.95), "JPEG", margin, 20, maxLineWidth, (maxLineWidth * cm1.height) / cm1.width);
+          pdf.addImage(
+            cm1.toDataURL("image/jpeg", 0.95),
+            "JPEG",
+            margin,
+            20,
+            maxLineWidth,
+            (maxLineWidth * cm1.height) / cm1.width,
+          );
         }
         // Mobile Page 3: Monthly Energy
         const m2 = document.getElementById("monthlyEnergyChart");
         if (m2) {
           pdf.addPage();
           const cm2 = await html2canvas(m2, { scale: 2 });
-          pdf.addImage(cm2.toDataURL("image/jpeg", 0.95), "JPEG", margin, 20, maxLineWidth, (maxLineWidth * cm2.height) / cm2.width);
+          pdf.addImage(
+            cm2.toDataURL("image/jpeg", 0.95),
+            "JPEG",
+            margin,
+            20,
+            maxLineWidth,
+            (maxLineWidth * cm2.height) / cm2.width,
+          );
         }
       } else {
         // PC Page 2: Both Monthly Charts combined
         const pcMonthDiv = document.createElement("div");
-        pcMonthDiv.style.cssText = "position:fixed; left:-9999px; width:1200px; padding:40px; background:#fff;";
+        pcMonthDiv.style.cssText =
+          "position:fixed; left:-9999px; width:1200px; padding:40px; background:#fff;";
         const s1 = document.getElementById("monthlyBarChart");
         const s2 = document.getElementById("monthlyEnergyChart");
-        if(s1) { const c1 = await html2canvas(s1, {scale:2}); const i1 = document.createElement("img"); i1.src=c1.toDataURL(); i1.style.width="100%"; pcMonthDiv.appendChild(i1); }
-        if(s2) { const c2 = await html2canvas(s2, {scale:2}); const i2 = document.createElement("img"); i2.src=c2.toDataURL(); i2.style.width="100%"; pcMonthDiv.appendChild(i2); }
+        if (s1) {
+          const c1 = await html2canvas(s1, { scale: 2 });
+          const i1 = document.createElement("img");
+          i1.src = c1.toDataURL();
+          i1.style.width = "100%";
+          pcMonthDiv.appendChild(i1);
+        }
+        if (s2) {
+          const c2 = await html2canvas(s2, { scale: 2 });
+          const i2 = document.createElement("img");
+          i2.src = c2.toDataURL();
+          i2.style.width = "100%";
+          pcMonthDiv.appendChild(i2);
+        }
         document.body.appendChild(pcMonthDiv);
-        const cpcm = await html2canvas(pcMonthDiv, {scale:2});
+        const cpcm = await html2canvas(pcMonthDiv, { scale: 2 });
         pdf.addPage();
-        pdf.addImage(cpcm.toDataURL("image/jpeg", 0.95), "JPEG", margin, 20, maxLineWidth, (maxLineWidth * cpcm.height) / cpcm.width);
+        pdf.addImage(
+          cpcm.toDataURL("image/jpeg", 0.95),
+          "JPEG",
+          margin,
+          20,
+          maxLineWidth,
+          (maxLineWidth * cpcm.height) / cpcm.width,
+        );
         document.body.removeChild(pcMonthDiv);
       }
     }
 
     // --- THE WRAPPER PAGE (ALERTS + LIFETIME CHART) ---
     // This runs for both Mobile and PC, ensuring Error Messages are NEVER missing.
-   // --- THE WRAPPER PAGE (ALERTS + LIFETIME CHART) ---
+    // --- THE WRAPPER PAGE (ALERTS + LIFETIME CHART) ---
     const finalWrapper = document.createElement("div");
     // Background of the whole page remains white
-    finalWrapper.style.cssText = "position:fixed; left:-9999px; width:1000px; padding:40px; background:#fff; display:flex; flex-direction:column; align-items:center;";
-    
+    finalWrapper.style.cssText =
+      "position:fixed; left:-9999px; width:1000px; padding:40px; background:#fff; display:flex; flex-direction:column; align-items:center;";
+
     // 1. Add Alert Title
     const alertsTitle = document.createElement("div");
     alertsTitle.innerText = "3. System Performance Alerts"; // Matching the style in the 2nd image
-    alertsTitle.style.cssText = "font-size:24px; font-weight:bold; margin-bottom:20px; color:#333; text-align:center; font-family:Arial, sans-serif;";
+    alertsTitle.style.cssText =
+      "font-size:24px; font-weight:bold; margin-bottom:20px; color:#333; text-align:center; font-family:Arial, sans-serif;";
     finalWrapper.appendChild(alertsTitle);
 
     // 2. Add the Alert Box (The "Past Look" fix)
     const evClone = eventsArea.cloneNode(true);
     const alertContent = evClone.innerText.toLowerCase();
-    const hasErrors = alertContent.includes("drop") || alertContent.includes("alert");
+    const hasErrors =
+      alertContent.includes("drop") || alertContent.includes("alert");
 
     // Apply specific styling to make it look like image 2 (Narrower, centered, and clean)
     evClone.style.cssText = `
@@ -1179,34 +1390,41 @@ async function downloadDashboardSection() {
     `;
 
     if (hasErrors) {
-        evClone.style.backgroundColor = "#fee2e2"; 
-        evClone.style.border = "2px solid #ef4444"; 
-        evClone.style.color = "#991b1b";
+      evClone.style.backgroundColor = "#fee2e2";
+      evClone.style.border = "2px solid #ef4444";
+      evClone.style.color = "#991b1b";
     } else {
-        evClone.style.backgroundColor = "#f0fdf4"; 
-        evClone.style.border = "2px solid #22c55e"; 
-        evClone.style.color = "#166534";
+      evClone.style.backgroundColor = "#f0fdf4";
+      evClone.style.border = "2px solid #22c55e";
+      evClone.style.color = "#166534";
     }
     finalWrapper.appendChild(evClone);
 
     // 3. Add Lifetime Title
     const lifeTitle = document.createElement("div");
-    lifeTitle.innerText = yearSelect && yearSelect.value
-      ? `MONTHLY SOLAR ENERGY (${yearSelect.value})`
-      : "MONTHLY SOLAR ENERGY (SELECTED PERIOD)";
-    lifeTitle.style.cssText = "font-size:22px; font-weight:bold; margin-bottom:20px; color:#8b5cf6; text-transform: uppercase;";
+    lifeTitle.innerText =
+      yearSelect && yearSelect.value
+        ? `MONTHLY SOLAR ENERGY (${yearSelect.value})`
+        : "MONTHLY SOLAR ENERGY (SELECTED PERIOD)";
+    lifeTitle.style.cssText =
+      "font-size:22px; font-weight:bold; margin-bottom:20px; color:#8b5cf6; text-transform: uppercase;";
     finalWrapper.appendChild(lifeTitle);
 
     const lifeSubTitle = document.createElement("div");
-    lifeSubTitle.innerText = (lifetimeRangeText && lifetimeRangeText.innerText)
-      ? lifetimeRangeText.innerText
-      : "This chart shows month-wise solar energy generated for the selected period.";
-    lifeSubTitle.style.cssText = "font-size:14px; margin-bottom:16px; color:#4b5563; text-align:center;";
+    lifeSubTitle.innerText =
+      lifetimeRangeText && lifetimeRangeText.innerText
+        ? lifetimeRangeText.innerText
+        : "This chart shows month-wise solar energy generated for the selected period.";
+    lifeSubTitle.style.cssText =
+      "font-size:14px; margin-bottom:16px; color:#4b5563; text-align:center;";
     finalWrapper.appendChild(lifeSubTitle);
 
     // 4. Add Lifetime Graph
     if (lifetimeChart) {
-      const cLife = await html2canvas(lifetimeChart, { scale: 3, backgroundColor: "#ffffff" });
+      const cLife = await html2canvas(lifetimeChart, {
+        scale: 3,
+        backgroundColor: "#ffffff",
+      });
       const imgLife = document.createElement("img");
       imgLife.src = cLife.toDataURL("image/png");
       imgLife.style.cssText = "width:85%; height:auto; margin: 0 auto;"; // Slightly smaller chart for better layout
@@ -1214,13 +1432,20 @@ async function downloadDashboardSection() {
     }
 
     document.body.appendChild(finalWrapper);
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise((r) => setTimeout(r, 600));
     const canvFinal = await html2canvas(finalWrapper, { scale: 2 });
-    
+
     pdf.addPage();
     let hFinal = (maxLineWidth * canvFinal.height) / canvFinal.width;
     if (hFinal > contentMaxHeight) hFinal = contentMaxHeight;
-    pdf.addImage(canvFinal.toDataURL("image/jpeg", 0.95), "JPEG", margin, 15, maxLineWidth, hFinal);
+    pdf.addImage(
+      canvFinal.toDataURL("image/jpeg", 0.95),
+      "JPEG",
+      margin,
+      15,
+      maxLineWidth,
+      hFinal,
+    );
     document.body.removeChild(finalWrapper);
 
     // --- FOOTER ---
@@ -1229,7 +1454,9 @@ async function downloadDashboardSection() {
       pdf.setPage(i);
       pdf.setFontSize(10);
       pdf.setTextColor(150);
-      pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: "center" });
+      pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, {
+        align: "center",
+      });
     }
 
     pdf.save(`Solar_Report_${dateValue}.pdf`);
@@ -1252,6 +1479,3 @@ function addPdfHeader(pdf, dateValue, margin) {
   pdf.text(`Generated On: ${new Date().toLocaleString()}`, margin, 22);
   pdf.text(`Reported Date: ${dateValue}`, margin, 27);
 }
-
-
-
