@@ -43,29 +43,25 @@
         </button>
 
         <button id="monthViewBtn" class="download-btn">📊 Month View</button>
-
-        <!-- <div class="date-nav-group">
-          <button
-            id="prevDateBtn"
-            class="nav-date-btn"
-            onclick="goToPreviousDate()"
-          >
-            <span class="icon">⟨</span>
-            <span>Previous</span>
-          </button>
-
-          <input type="date" id="todayDisplay" class="static-date" disabled />
-
-          <button
-            id="nextDateBtn"
-            class="nav-date-btn"
-            onclick="goToNextDate()"
-          >
-            <span>Next</span>
-            <span class="icon">⟩</span>
-          </button>
-        </div> -->
       </section>
+
+      <!-- Weather Details Card -->
+      <div id="weather-card" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; font-family: Arial, sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,0.05); gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span id="weather-icon" style="font-size: 24px;">🌤️</span>
+          <div>
+            <div style="font-size: 12px; color: #64748b; font-weight: bold; text-transform: uppercase;">GPREC College Location Weather</div>
+            <div id="weather-condition" style="font-size: 14px; font-weight: 600; color: #1e293b;">Loading weather...</div>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 15px; font-size: 13px; color: #334155;">
+          <div>🌡️ Temp: <strong id="weather-temp">--°C</strong></div>
+          <div>💧 Humidity: <strong id="weather-humidity">--%</strong></div>
+          <div>💨 Wind: <strong id="weather-wind">-- km/h</strong></div>
+          <div>☀️ Solar Rad: <strong id="weather-radiation">-- W/m²</strong></div>
+        </div>
+      </div>
+
       <div id="monthViewPopup" class="month-popup" style="display: none">
         <div class="tempCloseContainer" style="text-align: end">
           <div class="closeContainer">

@@ -277,10 +277,83 @@ function onDateSelect() {
   }
 }
 
+const GPREC_LAT = 15.8281;
+const GPREC_LON = 77.0374;
+
+async function fetchGprecWeather(dateStr) {
+  const tempEl = document.getElementById("weather-temp");
+  const humidityEl = document.getElementById("weather-humidity");
+  const windEl = document.getElementById("weather-wind");
+  const radiationEl = document.getElementById("weather-radiation");
+  const conditionEl = document.getElementById("weather-condition");
+  const iconEl = document.getElementById("weather-icon");
+
+  if (!tempEl) return;
+
+  try {
+    // Added wind_speed_10m and shortwave_radiation to the API parameters
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${GPREC_LAT}&longitude=${GPREC_LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,shortwave_radiation,weather_code&timezone=auto`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+    console.log(data)
+
+    if (data && data.current) {
+      const temp = data.current.temperature_2m;
+      const humidity = data.current.relative_humidity_2m;
+      const windSpeed = data.current.wind_speed_10m;
+      const radiation = data.current.shortwave_radiation;
+      const weatherCode = data.current.weather_code;
+
+      tempEl.innerText = `${temp}°C`;
+      humidityEl.innerText = `${humidity}%`;
+      if (windEl) windEl.innerText = `${windSpeed} km/h`;
+      if (radiationEl) radiationEl.innerText = `${radiation !== undefined ? radiation : 0} W/m²`;
+      
+      const weatherInfo = getWeatherDescription(weatherCode);
+      conditionEl.innerText = weatherInfo.text;
+      iconEl.innerText = weatherInfo.icon;
+    } else {
+      throw new Error("Invalid weather data");
+    }
+  } catch (error) {
+    tempEl.innerText = "--°C";
+    humidityEl.innerText = "--%";
+    if (windEl) windEl.innerText = "-- km/h";
+    if (radiationEl) radiationEl.innerText = "-- W/m²";
+    conditionEl.innerText = "Weather data unavailable";
+  }
+}
+
+function getWeatherDescription(code) {
+  switch (code) {
+    case 0: return { text: "Clear Sky", icon: "☀️" };
+    case 1:
+    case 2:
+    case 3: return { text: "Partly Cloudy / Overcast", icon: "⛅" };
+    case 45:
+    case 48: return { text: "Foggy", icon: "🌫️" };
+    case 51:
+    case 53:
+    case 55: return { text: "Drizzle", icon: "🌧️" };
+    case 61:
+    case 63:
+    case 65: return { text: "Rainy", icon: "🌧️" };
+    case 71:
+    case 73:
+    case 75: return { text: "Snowy", icon: "❄️" };
+    case 95:
+    case 96:
+    case 99: return { text: "Thunderstorm", icon: "⛈️" };
+    default: return { text: "Fair", icon: "🌤️" };
+  }
+}
+
 /* ---------- DATA LOADING ---------- */
 function loadData(dateValue) {
   clearError();
   showLoading();
+  fetchGprecWeather(dateValue);
 
   const sheetName = SHEET_PREFIX + dateValue;
   const query = new google.visualization.Query(
